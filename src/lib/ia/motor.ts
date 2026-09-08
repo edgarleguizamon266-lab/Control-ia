@@ -218,6 +218,17 @@ export async function procesarMensajeIA({
     throw new ErrorMotorIA("CONTROL IA no está configurado correctamente en el servidor todavía. Registrá tu movimiento manualmente por ahora.");
   }
 
+  // Fase 2.3: aplicar el límite real del plan ANTES de llamar al proveedor —
+  // antes esto no se verificaba nunca, sin importar cuánto costara.
+  const { data: suscripcion } = await supabase.rpc("fn_mi_suscripcion").maybeSingle();
+  const limite = (suscripcion as any)?.limite_operaciones_ia ?? 500;
+  const { data: usoActual } = await supabase.rpc("fn_uso_ia_este_mes", { p_user_id: userId });
+  if ((usoActual ?? 0) >= limite) {
+    throw new ErrorMotorIA(
+      `Ya usaste tus ${limite} mensajes de IA incluidos este mes. Podés seguir registrando movimientos manualmente, o ampliar tu plan en Suscripción.`
+    );
+  }
+
   let accionRealizada: Record<string, unknown> | null = null;
 
   async function auditar(accion: string, detalle: Record<string, unknown>) {
@@ -310,13 +321,7 @@ export async function procesarMensajeIA({
     }
 
     if (nombre === "get_subscription_status") {
-      const { data } = await supabase
-        .from("subscriptions")
-        .select("estado, fecha_fin, subscription_plans(nombre)")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const { data } = await supabase.rpc("fn_mi_suscripcion").maybeSingle();
       return data ?? { estado: "sin_suscripcion" };
     }
 

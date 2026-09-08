@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { subirComprobante } from "@/lib/supabase/comprobantes";
 import { formatMoney } from "@/lib/utils/currency";
 
 type Suscripcion = { estado: string; fecha_fin: string | null };
@@ -23,10 +24,10 @@ export default function SuscripcionPage() {
       } = await supabase.auth.getUser();
       if (!user) return;
       const [{ data: sub }, { data: settings }] = await Promise.all([
-        supabase.from("subscriptions").select("estado, fecha_fin").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.rpc("fn_mi_suscripcion").maybeSingle(),
         supabase.from("system_settings").select("valor").eq("clave", "pago_qr").maybeSingle(),
       ]);
-      setSuscripcion(sub);
+      setSuscripcion(sub as any);
       setConfigQr(settings?.valor ?? null);
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -40,9 +41,7 @@ export default function SuscripcionPage() {
     } = await supabase.auth.getUser();
     if (!user) return;
 
-    const path = `${user.id}/${Date.now()}-${comprobante.name}`;
-    const { data: subida } = await supabase.storage.from("comprobantes").upload(path, comprobante);
-    const comprobante_url = subida ? supabase.storage.from("comprobantes").getPublicUrl(subida.path).data.publicUrl : null;
+    const comprobante_url = await subirComprobante(supabase, user.id, comprobante);
 
     await supabase.from("payments").insert({
       user_id: user.id,

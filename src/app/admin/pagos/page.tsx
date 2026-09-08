@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { obtenerUrlFirmadaComprobante } from "@/lib/supabase/comprobantes";
 import { formatMoney } from "@/lib/utils/currency";
 
 type Pago = {
@@ -10,7 +11,7 @@ type Pago = {
   monto: number;
   banco: string | null;
   numero_operacion: string | null;
-  comprobante_url: string | null;
+  comprobante_url: string | null; // guarda el PATH privado, no una URL pública
   estado: "verificando" | "aprobado" | "rechazado";
   created_at: string;
 };
@@ -19,6 +20,7 @@ export default function AdminPagosPage() {
   const supabase = createClient();
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [nombresPorUsuario, setNombresPorUsuario] = useState<Record<string, string>>({});
+  const [urlsFirmadas, setUrlsFirmadas] = useState<Record<string, string>>({});
   const [cargando, setCargando] = useState(true);
   const [procesando, setProcesando] = useState<string | null>(null);
 
@@ -38,6 +40,19 @@ export default function AdminPagosPage() {
       for (const p of perfiles ?? []) mapa[p.id] = `${p.nombre} ${p.apellido}`;
       setNombresPorUsuario(mapa);
     }
+
+    // El comprobante es privado — generar una URL firmada temporal por cada uno para poder mostrarlo acá.
+    const nuevasUrls: Record<string, string> = {};
+    await Promise.all(
+      (pendientes ?? [])
+        .filter((p) => p.comprobante_url)
+        .map(async (p) => {
+          const url = await obtenerUrlFirmadaComprobante(supabase, p.comprobante_url!);
+          if (url) nuevasUrls[p.id] = url;
+        })
+    );
+    setUrlsFirmadas(nuevasUrls);
+
     setCargando(false);
   }
 
@@ -78,9 +93,9 @@ export default function AdminPagosPage() {
         )}
         {pendientes.map((p) => (
           <div key={p.id} className="card p-4 flex flex-col md:flex-row gap-4 md:items-center">
-            {p.comprobante_url && (
-              <a href={p.comprobante_url} target="_blank" rel="noreferrer" className="shrink-0">
-                <img src={p.comprobante_url} alt="Comprobante" className="w-24 h-24 object-cover rounded-lg border border-black/10" />
+            {urlsFirmadas[p.id] && (
+              <a href={urlsFirmadas[p.id]} target="_blank" rel="noreferrer" className="shrink-0">
+                <img src={urlsFirmadas[p.id]} alt="Comprobante" className="w-24 h-24 object-cover rounded-lg border border-black/10" />
               </a>
             )}
             <div className="flex-1">

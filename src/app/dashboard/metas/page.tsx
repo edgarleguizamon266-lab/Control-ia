@@ -5,6 +5,7 @@ import { Plus, Target } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { formatMoney, parseMoneyInput } from "@/lib/utils/currency";
+import ModalMontoCuenta from "@/components/ModalMontoCuenta";
 
 type Meta = { id: string; nombre: string; monto_objetivo: number; monto_ahorrado: number; fecha_limite: string | null };
 
@@ -17,6 +18,7 @@ export default function MetasPage() {
   const [objetivo, setObjetivo] = useState(0);
   const [fecha, setFecha] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [metaOperacion, setMetaOperacion] = useState<{ meta: Meta; tipo: "aportar" | "retirar" } | null>(null);
 
   async function cargar() {
     if (!workspaceActual) return;
@@ -57,11 +59,13 @@ export default function MetasPage() {
     cargar();
   }
 
-  async function agregarAhorro(meta: Meta, monto: number) {
-    await supabase
-      .from("goals")
-      .update({ monto_ahorrado: Number(meta.monto_ahorrado) + monto })
-      .eq("id", meta.id);
+  // Fase 3.7: aportar/retirar ahora mueve dinero real de/hacia una cuenta —
+  // antes "monto_ahorrado" era un número que se inflaba solo, sin respaldo real.
+  async function confirmarOperacion(monto: number, cuentaId: string) {
+    if (!metaOperacion) return;
+    const fn = metaOperacion.tipo === "aportar" ? "fn_aportar_meta" : "fn_retirar_meta";
+    const { error } = await supabase.rpc(fn, { p_goal_id: metaOperacion.meta.id, p_monto: monto, p_account_id: cuentaId });
+    if (error) throw new Error(error.message);
     cargar();
   }
 
@@ -92,16 +96,16 @@ export default function MetasPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-black/40">{porcentaje}%</span>
-                <button
-                  className="text-xs text-brand-600 font-medium"
-                  onClick={() => {
-                    const valor = prompt("¿Cuánto querés agregar a esta meta?");
-                    const monto = valor ? parseMoneyInput(valor) : 0;
-                    if (monto > 0) agregarAhorro(m, monto);
-                  }}
-                >
-                  + Agregar ahorro
-                </button>
+                <div className="flex gap-3">
+                  {Number(m.monto_ahorrado) > 0 && (
+                    <button className="text-xs text-black/50 font-medium" onClick={() => setMetaOperacion({ meta: m, tipo: "retirar" })}>
+                      Retirar
+                    </button>
+                  )}
+                  <button className="text-xs text-brand-600 font-medium" onClick={() => setMetaOperacion({ meta: m, tipo: "aportar" })}>
+                    + Aportar
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -129,6 +133,17 @@ export default function MetasPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {metaOperacion && workspaceActual && (
+        <ModalMontoCuenta
+          titulo={`${metaOperacion.tipo === "aportar" ? "Aportar a" : "Retirar de"} — ${metaOperacion.meta.nombre}`}
+          workspaceId={workspaceActual.id}
+          montoMaximo={metaOperacion.tipo === "retirar" ? Number(metaOperacion.meta.monto_ahorrado) : undefined}
+          textoBoton={metaOperacion.tipo === "aportar" ? "Aportar" : "Retirar"}
+          onConfirmar={confirmarOperacion}
+          onCerrar={() => setMetaOperacion(null)}
+        />
       )}
     </div>
   );

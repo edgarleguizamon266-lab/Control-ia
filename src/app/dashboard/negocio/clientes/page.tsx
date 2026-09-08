@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { formatMoney, parseMoneyInput } from "@/lib/utils/currency";
+import ModalMontoCuenta from "@/components/ModalMontoCuenta";
 
 type Cliente = {
   id: string;
@@ -24,6 +25,7 @@ export default function ClientesPage() {
   const [nombre, setNombre] = useState("");
   const [contacto, setContacto] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [clienteParaCobrar, setClienteParaCobrar] = useState<Cliente | null>(null);
 
   async function cargar() {
     if (!negocio) return;
@@ -56,49 +58,14 @@ export default function ClientesPage() {
     cargar();
   }
 
-  async function registrarCobro(cliente: Cliente) {
-    const valor = prompt(`¿Cuánto te pagó ${cliente.nombre}?`);
-    const monto = valor ? parseMoneyInput(valor) : 0;
-    if (monto <= 0 || !negocio) return;
-
-    const { data: cuentas } = await supabase.from("accounts").select("id, nombre").eq("workspace_id", negocio.id).eq("activa", true);
-    if (!cuentas || cuentas.length === 0) {
-      alert("Creá una cuenta primero para poder registrar el cobro.");
-      return;
-    }
-    const nombresCuentas = cuentas.map((c, i) => `${i + 1}. ${c.nombre}`).join("\n");
-    const eleccion = prompt(`¿En qué cuenta lo recibiste?\n${nombresCuentas}`);
-    const idx = eleccion ? parseInt(eleccion, 10) - 1 : -1;
-    const cuenta = cuentas[idx];
-    if (!cuenta) return;
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    const { data: categoria } = await supabase
-      .from("transaction_categories")
-      .select("id")
-      .eq("workspace_tipo", "negocio")
-      .eq("nombre", "Ventas")
-      .eq("tipo", "ingreso")
-      .maybeSingle();
-
-    await supabase.from("transactions").insert({
-      user_id: user?.id,
-      workspace_id: negocio.id,
-      account_id: cuenta.id,
-      category_id: categoria?.id ?? null,
-      tipo: "ingreso",
-      monto,
-      descripcion: `Cobro a ${cliente.nombre}`,
+  async function registrarCobro(monto: number, cuentaId: string) {
+    if (!clienteParaCobrar) return;
+    const { error } = await supabase.rpc("fn_registrar_cobro_cliente", {
+      p_customer_id: clienteParaCobrar.id,
+      p_monto: monto,
+      p_account_id: cuentaId,
     });
-
-    await supabase
-      .from("customers")
-      .update({ saldo_pendiente: Math.max(0, Number(cliente.saldo_pendiente) - monto) })
-      .eq("id", cliente.id);
-
+    if (error) throw new Error(error.message);
     cargar();
   }
 
@@ -123,7 +90,7 @@ export default function ClientesPage() {
               {Number(c.saldo_pendiente) > 0 ? (
                 <>
                   <div className="text-sm font-medium text-red-500">Debe {formatMoney(c.saldo_pendiente, moneda)}</div>
-                  <button className="text-xs text-brand-600 font-medium" onClick={() => registrarCobro(c)}>
+                  <button className="text-xs text-brand-600 font-medium" onClick={() => setClienteParaCobrar(c)}>
                     + Registrar cobro
                   </button>
                 </>
@@ -148,6 +115,17 @@ export default function ClientesPage() {
             <button className="btn-primary flex-1" disabled={guardando} onClick={agregar}>Guardar</button>
           </div>
         </div>
+      )}
+
+      {clienteParaCobrar && negocio && (
+        <ModalMontoCuenta
+          titulo={`Cobro — ${clienteParaCobrar.nombre}`}
+          workspaceId={negocio.id}
+          montoMaximo={Number(clienteParaCobrar.saldo_pendiente)}
+          textoBoton="Registrar cobro"
+          onConfirmar={registrarCobro}
+          onCerrar={() => setClienteParaCobrar(null)}
+        />
       )}
     </div>
   );

@@ -38,9 +38,10 @@ export default function AdminConfiguracionPage() {
 
     let qr_url = config.qr_url;
     if (archivoQr) {
+      // El QR es un dato público (nadie financiero-privado) — vive en el bucket "branding".
       const path = `qr/${Date.now()}-${archivoQr.name}`;
-      const { data: subida } = await supabase.storage.from("comprobantes").upload(path, archivoQr, { upsert: true });
-      if (subida) qr_url = supabase.storage.from("comprobantes").getPublicUrl(subida.path).data.publicUrl;
+      const { data: subida } = await supabase.storage.from("branding").upload(path, archivoQr, { upsert: true });
+      if (subida) qr_url = supabase.storage.from("branding").getPublicUrl(subida.path).data.publicUrl;
     }
 
     await supabase.from("system_settings").update({ valor: { ...config, qr_url }, updated_at: new Date().toISOString() }).eq("clave", "pago_qr");

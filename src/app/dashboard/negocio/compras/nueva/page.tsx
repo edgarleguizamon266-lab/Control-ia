@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { subirComprobante } from "@/lib/supabase/comprobantes";
 import { useWorkspace } from "@/lib/workspace-context";
 import { formatMoney, parseMoneyInput } from "@/lib/utils/currency";
 
@@ -78,9 +79,7 @@ export default function NuevaCompraPage() {
 
     let comprobante_url: string | null = null;
     if (comprobante) {
-      const path = `${userId}/${Date.now()}-${comprobante.name}`;
-      const { data: subida } = await supabase.storage.from("comprobantes").upload(path, comprobante);
-      if (subida) comprobante_url = supabase.storage.from("comprobantes").getPublicUrl(subida.path).data.publicUrl;
+      comprobante_url = await subirComprobante(supabase, userId, comprobante);
     }
 
     let transactionId: string | null = null;

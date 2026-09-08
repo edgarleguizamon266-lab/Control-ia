@@ -1,0 +1,130 @@
+control-ia/
+├── .env.example
+├── .gitignore
+├── README.md
+├── WHATSAPP_AUDIO_PROMPT_MAESTRO.md
+├── next-env.d.ts
+├── next.config.js
+├── package-lock.json
+├── package.json
+├── postcss.config.js
+├── src/
+│   ├── app/
+│   │   ├── admin/
+│   │   │   ├── configuracion/
+│   │   │   │   └── page.tsx
+│   │   │   ├── layout.tsx
+│   │   │   ├── page.tsx
+│   │   │   ├── pagos/
+│   │   │   │   └── page.tsx
+│   │   │   ├── planes/
+│   │   │   │   └── page.tsx
+│   │   │   └── usuarios/
+│   │   │       ├── [id]/
+│   │   │       │   └── page.tsx
+│   │   │       └── page.tsx
+│   │   ├── api/
+│   │   │   ├── ia/
+│   │   │   │   ├── comprobante/
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── route.ts
+│   │   │   └── whatsapp/
+│   │   │       ├── signup/
+│   │   │       │   └── route.ts
+│   │   │       └── webhook/
+│   │   │           └── route.ts
+│   │   ├── dashboard/
+│   │   │   ├── categorias/
+│   │   │   │   └── page.tsx
+│   │   │   ├── configuracion/
+│   │   │   │   └── whatsapp/
+│   │   │   │       └── page.tsx
+│   │   │   ├── cuentas/
+│   │   │   │   └── page.tsx
+│   │   │   ├── deudas/
+│   │   │   │   └── page.tsx
+│   │   │   ├── ia/
+│   │   │   │   └── page.tsx
+│   │   │   ├── layout.tsx
+│   │   │   ├── metas/
+│   │   │   │   └── page.tsx
+│   │   │   ├── movimientos/
+│   │   │   │   ├── [id]/
+│   │   │   │   │   └── editar/
+│   │   │   │   │       └── page.tsx
+│   │   │   │   ├── nuevo/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── page.tsx
+│   │   │   │   └── transferencia/
+│   │   │   │       └── page.tsx
+│   │   │   ├── negocio/
+│   │   │   │   ├── clientes/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── compras/
+│   │   │   │   │   └── nueva/
+│   │   │   │   │       └── page.tsx
+│   │   │   │   ├── page.tsx
+│   │   │   │   ├── proveedores/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   └── ventas/
+│   │   │   │       └── nueva/
+│   │   │   │           └── page.tsx
+│   │   │   ├── page.tsx
+│   │   │   ├── presupuestos/
+│   │   │   │   └── page.tsx
+│   │   │   ├── reportes/
+│   │   │   │   └── page.tsx
+│   │   │   ├── suscripcion/
+│   │   │   │   └── page.tsx
+│   │   │   └── tarjetas/
+│   │   │       └── page.tsx
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   ├── login/
+│   │   │   └── page.tsx
+│   │   ├── page.tsx
+│   │   └── register/
+│   │       └── page.tsx
+│   ├── components/
+│   │   ├── Header.tsx
+│   │   ├── MobileNav.tsx
+│   │   ├── RegistroRapido.tsx
+│   │   ├── Sidebar.tsx
+│   │   ├── SummaryCard.tsx
+│   │   └── UltimosMovimientos.tsx
+│   ├── lib/
+│   │   ├── financial-engine.ts
+│   │   ├── ia/
+│   │   │   └── motor.ts
+│   │   ├── supabase/
+│   │   │   ├── client.ts
+│   │   │   └── server.ts
+│   │   ├── transcription/
+│   │   │   └── provider.ts
+│   │   ├── utils/
+│   │   │   └── currency.ts
+│   │   ├── whatsapp/
+│   │   │   └── provider.ts
+│   │   └── workspace-context.tsx
+│   └── middleware.ts
+├── supabase/
+│   ├── migration_002_fase1_gaps.sql
+│   ├── migration_003_admin_helpers.sql
+│   ├── migration_004_financial_engine.sql
+│   ├── migration_005_mi_negocio.sql
+│   ├── migration_006_security_hardening.sql
+│   ├── migration_007_revoke_anon_admin_functions.sql
+│   ├── migration_008_revoke_public_execute.sql
+│   ├── migration_009_storage_bucket.sql
+│   ├── migration_010_fix_onboarding_cuenta_default.sql
+│   ├── migration_011_cuenta_predeterminada.sql
+│   ├── migration_012_admin_user_detail.sql
+│   ├── migration_013_fix_admin_get_user_detail.sql
+│   ├── migration_014_fix_admin_get_user_detail_v2.sql
+│   └── schema.sql
+├── tailwind.config.ts
+├── tests/
+│   ├── README.md
+│   └── financial-engine.test.ts
+├── tsconfig.json
+└── vitest.config.ts

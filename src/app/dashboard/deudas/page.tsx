@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { formatMoney, parseMoneyInput } from "@/lib/utils/currency";
+import ModalMontoCuenta from "@/components/ModalMontoCuenta";
 
 type Deuda = {
   id: string;
@@ -25,6 +26,7 @@ export default function DeudasPage() {
   const [monto, setMonto] = useState(0);
   const [vencimiento, setVencimiento] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [deudaParaPagar, setDeudaParaPagar] = useState<Deuda | null>(null);
 
   async function cargar() {
     if (!workspaceActual) return;
@@ -67,12 +69,15 @@ export default function DeudasPage() {
     cargar();
   }
 
-  async function registrarPago(d: Deuda) {
-    const valor = prompt(`¿Cuánto pagó/pagaste de la deuda con ${d.persona}?`);
-    const pago = valor ? parseMoneyInput(valor) : 0;
-    if (pago <= 0) return;
-    const nuevoSaldo = Math.max(0, Number(d.saldo_pendiente) - pago);
-    await supabase.from("debts").update({ saldo_pendiente: nuevoSaldo }).eq("id", d.id);
+  async function registrarPago(monto: number, cuentaId: string) {
+    if (!deudaParaPagar) return;
+    const { error } = await supabase.rpc("fn_registrar_pago_deuda", {
+      p_debt_id: deudaParaPagar.id,
+      p_monto: monto,
+      p_account_id: cuentaId,
+      p_referencia: null,
+    });
+    if (error) throw new Error(error.message);
     cargar();
   }
 
@@ -118,7 +123,7 @@ export default function DeudasPage() {
               </div>
             </div>
             {Number(d.saldo_pendiente) > 0 && (
-              <button className="text-xs text-brand-600 font-medium mt-2" onClick={() => registrarPago(d)}>
+              <button className="text-xs text-brand-600 font-medium mt-2" onClick={() => setDeudaParaPagar(d)}>
                 + Registrar pago
               </button>
             )}
@@ -126,6 +131,17 @@ export default function DeudasPage() {
           </div>
         ))}
       </div>
+
+      {deudaParaPagar && workspaceActual && (
+        <ModalMontoCuenta
+          titulo={`Pago — ${deudaParaPagar.persona}`}
+          workspaceId={workspaceActual.id}
+          montoMaximo={Number(deudaParaPagar.saldo_pendiente)}
+          textoBoton={deudaParaPagar.tipo === "yo_debo" ? "Registrar pago" : "Registrar cobro"}
+          onConfirmar={registrarPago}
+          onCerrar={() => setDeudaParaPagar(null)}
+        />
+      )}
 
       {!mostrarForm ? (
         <button onClick={() => setMostrarForm(true)} className="btn-secondary">
