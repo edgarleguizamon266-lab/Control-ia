@@ -17,5 +17,5 @@
     "paths": { "@/*": ["./src/*"] }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude":   "exclude": ["node_modules", "tests", "vitest.config.ts", "control-ia"]
+  "exclude": ["node_modules", "tests", "vitest.config.ts", "control-ia"]
 }
