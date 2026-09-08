@@ -101,11 +101,7 @@ export default function DashboardPage() {
   }
 
   if (seleccion !== "todos" && !workspaceActual) {
-    return (
-      <div className="card p-8 text-center text-black/60">
-        Todavía no configuraste este espacio de trabajo.
-      </div>
-    );
+    return <ConfigurarNegocio />;
   }
 
   const hayMovimientosEsteMes = movimientosDelMes > 0;
@@ -186,5 +182,56 @@ function AccionRapida({ href, icon: Icon, label }: { href: string; icon: LucideI
       </div>
       <span className="text-xs font-medium">{label}</span>
     </Link>
+  );
+}
+
+// Sección 6 del prompt: nunca dejar una pantalla muerta. Si el usuario está
+// parado en "Negocio" pero todavía no tiene ese espacio configurado, ofrecer
+// una acción real (no un mensaje sin salida).
+function ConfigurarNegocio() {
+  const supabase = createClient();
+  const { setSeleccion } = useWorkspace();
+  const [creando, setCreando] = useState(false);
+
+  async function configurar() {
+    if (creando) return;
+    setCreando(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: nuevoWorkspace } = await supabase
+      .from("workspaces")
+      .insert({ user_id: user.id, tipo: "negocio", nombre: "Mi Negocio" })
+      .select()
+      .single();
+
+    if (nuevoWorkspace) {
+      await supabase.from("accounts").insert({
+        user_id: user.id,
+        workspace_id: nuevoWorkspace.id,
+        nombre: "Caja",
+        tipo: "caja_negocio",
+        saldo_inicial: 0,
+      });
+    }
+
+    setCreando(false);
+    setSeleccion("negocio");
+    window.location.reload(); // refresca el contexto de workspaces con el nuevo espacio
+  }
+
+  return (
+    <div className="card p-8 text-center flex flex-col items-center gap-3 max-w-md mx-auto">
+      <div className="text-lg font-semibold">Configurá tu negocio</div>
+      <p className="text-sm text-black/50">Separá tus ventas, compras y gastos comerciales de tus finanzas personales.</p>
+      <button onClick={configurar} disabled={creando} className="btn-primary">
+        {creando ? "Configurando..." : "Configurar mi negocio"}
+      </button>
+      <button onClick={() => setSeleccion("personal")} className="text-sm text-black/40">
+        Volver a Personal
+      </button>
+    </div>
   );
 }
