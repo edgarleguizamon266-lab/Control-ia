@@ -13,9 +13,9 @@ type Usuario = {
   role: string;
   tipo_uso: string;
   created_at: string;
-  ultimo_acceso: string | null;
-  suscripcion_estado: string | null;
-  suscripcion_vencimiento: string | null;
+  last_sign_in_at: string | null;
+  estado: string | null;
+  fecha_fin: string | null;
 };
 
 const BADGE: Record<string, string> = {
@@ -97,12 +97,12 @@ export default function AdminUsuariosPage() {
                 <td className="p-3 text-black/60">{u.email}</td>
                 <td className="p-3 text-black/60">{u.whatsapp ?? "—"}</td>
                 <td className="p-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${BADGE[u.suscripcion_estado ?? ""] ?? "bg-black/10 text-black/50"}`}>
-                    {u.suscripcion_estado ?? "sin suscripción"}
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${BADGE[u.estado ?? ""] ?? "bg-black/10 text-black/50"}`}>
+                    {u.estado ?? "sin suscripción"}
                   </span>
                 </td>
-                <td className="p-3 text-black/60">{u.suscripcion_vencimiento ? new Date(u.suscripcion_vencimiento).toLocaleDateString("es-PY") : "—"}</td>
-                <td className="p-3 text-black/60">{u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleDateString("es-PY") : "—"}</td>
+                <td className="p-3 text-black/60">{u.fecha_fin ? new Date(u.fecha_fin).toLocaleDateString("es-PY") : "—"}</td>
+                <td className="p-3 text-black/60">{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString("es-PY") : "—"}</td>
                 <td className="p-3">
                   <div className="flex gap-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
                     <button className="text-xs text-brand-600 hover:underline" onClick={() => actualizar(u.id, "activo")}>Activar</button>
