@@ -11,6 +11,7 @@ type Deuda = {
   id: string;
   tipo: "yo_debo" | "me_deben";
   persona: string;
+  nombre: string | null;
   monto_total: number;
   saldo_pendiente: number;
   fecha_vencimiento: string | null;
@@ -23,6 +24,7 @@ export default function DeudasPage() {
   const [tab, setTab] = useState<"yo_debo" | "me_deben">("yo_debo");
   const [mostrarForm, setMostrarForm] = useState(false);
   const [persona, setPersona] = useState("");
+  const [nombreDeuda, setNombreDeuda] = useState("");
   const [monto, setMonto] = useState(0);
   const [vencimiento, setVencimiento] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -32,7 +34,7 @@ export default function DeudasPage() {
     if (!workspaceActual) return;
     const { data } = await supabase
       .from("debts")
-      .select("id, tipo, persona, monto_total, saldo_pendiente, fecha_vencimiento")
+      .select("id, tipo, persona, nombre, monto_total, saldo_pendiente, fecha_vencimiento")
       .eq("workspace_id", workspaceActual.id)
       .order("created_at", { ascending: false });
     setDeudas(data ?? []);
@@ -56,12 +58,14 @@ export default function DeudasPage() {
       workspace_id: workspaceActual.id,
       tipo: tab,
       persona,
+      nombre: nombreDeuda || null,
       monto_total: monto,
       saldo_pendiente: monto,
       fecha_vencimiento: vencimiento || null,
     });
 
     setPersona("");
+    setNombreDeuda("");
     setMonto(0);
     setVencimiento("");
     setMostrarForm(false);
@@ -113,6 +117,7 @@ export default function DeudasPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium text-sm">{d.persona}</div>
+                {d.nombre && <div className="text-xs text-black/50">{d.nombre}</div>}
                 <div className="text-xs text-black/40">
                   Total: {formatMoney(d.monto_total, moneda, !mostrarSaldos)}
                   {d.fecha_vencimiento && ` · Vence ${new Date(d.fecha_vencimiento).toLocaleDateString("es-PY")}`}
@@ -150,6 +155,7 @@ export default function DeudasPage() {
       ) : (
         <div className="card p-4 flex flex-col gap-3">
           <input className="input" placeholder="Persona o entidad" value={persona} onChange={(e) => setPersona(e.target.value)} />
+          <input className="input" placeholder="Nombre de la deuda (opcional, ej. Préstamo familiar)" value={nombreDeuda} onChange={(e) => setNombreDeuda(e.target.value)} />
           <input
             className="input"
             placeholder="Monto"
