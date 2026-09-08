@@ -161,4 +161,37 @@ export async function getPatrimonioNeto(supabase: SupabaseClient, workspaceId: s
 
 export type MovimientoEnriquecido = {
   id: string;
-  tipo: "gasto" | "ingreso" |
+  tipo: "gasto" | "ingreso" | "transferencia";
+  monto: number;
+  fecha: string;
+  descripcion: string | null;
+  origen: string;
+  categoria: string | null;
+  cuenta: string | null;
+  es_pago_deuda: boolean;
+  deuda_id: string | null;
+  deuda_nombre: string | null;
+  deuda_persona: string | null;
+  deuda_tipo: "yo_debo" | "me_deben" | null;
+  deuda_monto_total: number | null;
+  deuda_saldo_pendiente: number | null;
+  pago_deuda_monto: number | null;
+};
+
+export async function getMovimientosEnriquecidos(supabase: SupabaseClient, workspaceIds: string[], limite = 150): Promise<MovimientoEnriquecido[]> {
+  const { data, error } = await supabase.rpc("fn_movimientos_enriquecidos", { p_workspace_ids: workspaceIds, p_limite: limite });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getDeudaPagadoAcumulado(supabase: SupabaseClient, deudaId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("fn_deuda_pagado_acumulado", { p_debt_id: deudaId });
+  if (error) throw error;
+  return Number(data ?? 0);
+}
+
+export function primerYUltimoDiaDelMes(fecha = new Date()) {
+  const desde = new Date(fecha.getFullYear(), fecha.getMonth(), 1).toISOString().slice(0, 10);
+  const hasta = fecha.toISOString().slice(0, 10);
+  return { desde, hasta };
+}
