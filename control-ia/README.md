@@ -184,6 +184,5 @@ src/
       whatsapp/webhook/route.ts  → verificación + recepción idempotente
   lib/
     supabase/ workspace-context.tsx utils/currency.ts
-    whatsapp/provider.ts         → abstracción de proveedor .
-
+    whatsapp/provider.ts         → abstracción de proveedor
 ```
