@@ -19,11 +19,20 @@ type Mov = {
 
 type Filtro = "todos" | "ingreso" | "gasto" | "transferencia";
 
+// Sección "Nivel Alto 5": el empty state debe reflejar el filtro activo, no un mensaje genérico.
+const EMPTY_STATE: Record<Filtro, { mensaje: string; boton: string; href: string }> = {
+  todos: { mensaje: "Todavía no registraste movimientos.", boton: "Nuevo movimiento", href: "/dashboard/movimientos/nuevo" },
+  ingreso: { mensaje: "Todavía no registraste ingresos.", boton: "Registrar ingreso", href: "/dashboard/movimientos/nuevo?tipo=ingreso" },
+  gasto: { mensaje: "Todavía no registraste gastos.", boton: "Registrar gasto", href: "/dashboard/movimientos/nuevo?tipo=gasto" },
+  transferencia: { mensaje: "Todavía no realizaste transferencias.", boton: "Realizar transferencia", href: "/dashboard/movimientos/transferencia" },
+};
+
 export default function MovimientosPage() {
   const supabase = createClient();
   const { workspaceActual, workspaces, seleccion, moneda, mostrarSaldos, cargando: cargandoWs } = useWorkspace();
   const [movs, setMovs] = useState<Mov[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [busqueda, setBusqueda] = useState("");
 
@@ -34,12 +43,24 @@ export default function MovimientosPage() {
       return;
     }
     setCargando(true);
-    const { data } = await supabase
+    setErrorCarga(null);
+    const { data, error } = await supabase
       .from("transactions")
-      .select("id, tipo, monto, fecha, descripcion, transaction_categories(nombre), accounts(nombre)")
+      .select("id, tipo, monto, fecha, descripcion, transaction_categories(nombre), accounts!account_id(nombre)")
       .in("workspace_id", ids)
       .order("fecha", { ascending: false })
       .limit(150);
+
+    if (error) {
+      // Nunca disfrazar un error real de base de datos como "no hay movimientos" —
+      // eso fue exactamente la causa del bug Dashboard-vs-Movimientos.
+      console.error("[movimientos] Error al cargar:", error);
+      setErrorCarga("No se pudieron cargar tus movimientos. Probá recargar la página.");
+      setMovs([]);
+      setCargando(false);
+      return;
+    }
+
     setMovs((data as unknown as Mov[]) ?? []);
     setCargando(false);
   }
@@ -103,11 +124,17 @@ export default function MovimientosPage() {
 
       <div className="card divide-y divide-black/5">
         {cargando && <div className="p-4 text-sm text-black/40">Cargando...</div>}
-        {!cargando && movsFiltrados.length === 0 && (
+        {!cargando && errorCarga && (
+          <div className="p-8 text-center text-sm flex flex-col gap-3 items-center">
+            <span className="text-red-600">⚠️ {errorCarga}</span>
+            <button onClick={cargar} className="btn-secondary text-sm">Reintentar</button>
+          </div>
+        )}
+        {!cargando && !errorCarga && movsFiltrados.length === 0 && (
           <div className="p-8 text-center text-black/40 text-sm flex flex-col gap-3 items-center">
-            Todavía no registraste movimientos.
-            <Link href="/dashboard/movimientos/nuevo" className="btn-primary text-sm w-fit">
-              Registrar mi primer gasto
+            {EMPTY_STATE[filtro].mensaje}
+            <Link href={EMPTY_STATE[filtro].href} className="btn-primary text-sm w-fit">
+              {EMPTY_STATE[filtro].boton}
             </Link>
           </div>
         )}

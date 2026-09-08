@@ -117,7 +117,7 @@ export default function DashboardPage() {
         <SummaryCard titulo="Ingresos este mes" monto={ingresosMes} moneda={moneda} colorTexto="text-brand-600" />
         <SummaryCard titulo="Gastos este mes" monto={gastosMes} moneda={moneda} colorTexto="text-red-500" />
         <SummaryCard titulo="Disponible" monto={disponible} moneda={moneda} />
-        <SummaryCard titulo="Movimientos este mes" monto={movimientosDelMes} moneda="" />
+        <SummaryCard titulo="Movimientos este mes" monto={movimientosDelMes} esCantidad />
       </div>
 
       {/* 2. Registro rápido */}

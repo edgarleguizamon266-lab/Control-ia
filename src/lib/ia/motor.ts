@@ -60,13 +60,14 @@ const TOOLS: Anthropic.Tool[] = [
   // ---- Nivel 2: escritura simple ----
   {
     name: "create_transaction",
-    description: "Registra un gasto o ingreso real del usuario. Usar SIEMPRE que el usuario describa algo que gastó, compró, cobró o vendió (fuera del contexto de Negocio; para ventas de negocio usar create_sale).",
+    description: "Registra un gasto o ingreso real del usuario. Usar SIEMPRE que el usuario describa algo que gastó, compró, cobró o vendió (fuera del contexto de Negocio; para ventas de negocio usar create_sale). Si la herramienta responde requiere_confirmacion_categoria o requiere_eleccion_cuenta, preguntá al usuario antes de reintentar.",
     input_schema: {
       type: "object",
       properties: {
         tipo: { type: "string", enum: ["gasto", "ingreso"] },
         monto: { type: "number", description: "Monto numérico, sin símbolos ni separadores." },
         categoria: { type: "string", description: "Nombre de categoría, ej. Supermercado, Combustible, Sueldo." },
+        categoria_confirmada: { type: "boolean", description: "true SOLO si el usuario ya confirmó explícitamente crear esta categoría nueva en un mensaje anterior." },
         cuenta: { type: "string", description: "Nombre de la cuenta si el usuario la menciona (ej. Efectivo, Itaú)." },
         descripcion: { type: "string" },
         fecha: { type: "string", description: "Fecha en formato YYYY-MM-DD. Si no se menciona, usar hoy." },
@@ -223,6 +224,8 @@ export async function procesarMensajeIA({
     await supabase.from("audit_logs").insert({ user_id: userId, accion, detalle });
   }
 
+  // Sección 17: nunca cae en "Otros" en silencio si el nombre no matchea razonablemente.
+  // Devuelve la categoría encontrada, o null si no hay match claro (el motor debe preguntar).
   async function resolverCategoria(nombreBuscado: string, tipo: "gasto" | "ingreso") {
     const { data: categorias } = await supabase
       .from("transaction_categories")
@@ -231,10 +234,18 @@ export async function procesarMensajeIA({
       .eq("tipo", tipo);
     return (
       categorias?.find((c: any) => c.nombre.toLowerCase() === nombreBuscado.toLowerCase()) ??
-      categorias?.find((c: any) => c.nombre.toLowerCase().includes(nombreBuscado.toLowerCase())) ??
-      categorias?.find((c: any) => c.nombre === "Otros") ??
+      categorias?.find((c: any) => c.nombre.toLowerCase().includes(nombreBuscado.toLowerCase()) || nombreBuscado.toLowerCase().includes(c.nombre.toLowerCase())) ??
       null
     );
+  }
+
+  async function obtenerCuentaPredeterminada(tipo: "gasto" | "ingreso") {
+    const { data: pref } = await supabase
+      .from("workspace_preferences")
+      .select("cuenta_predeterminada_gasto_id, cuenta_predeterminada_ingreso_id")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    return tipo === "gasto" ? pref?.cuenta_predeterminada_gasto_id ?? null : pref?.cuenta_predeterminada_ingreso_id ?? null;
   }
 
   async function ejecutarTool(nombre: string, input: any) {
@@ -249,12 +260,16 @@ export async function procesarMensajeIA({
     if (nombre === "get_transactions") {
       let query = supabase
         .from("transactions")
-        .select("id, tipo, monto, fecha, descripcion, transaction_categories(nombre), accounts(nombre)")
+        .select("id, tipo, monto, fecha, descripcion, transaction_categories(nombre), accounts!account_id(nombre)")
         .eq("workspace_id", workspaceId)
         .order("fecha", { ascending: false })
         .limit(input.limite ?? 10);
       if (input.tipo) query = query.eq("tipo", input.tipo);
-      const { data } = await query;
+      const { data, error } = await query;
+      if (error) {
+        console.error("[motor-ia] Error en get_transactions:", error);
+        return { error: "No pude consultar los movimientos ahora mismo." };
+      }
       let resultados = data ?? [];
       if (input.categoria) {
         resultados = resultados.filter((t: any) => t.transaction_categories?.nombre?.toLowerCase().includes(String(input.categoria).toLowerCase()));
@@ -307,9 +322,45 @@ export async function procesarMensajeIA({
 
     if (nombre === "create_transaction") {
       const categoria = await resolverCategoria(input.categoria, input.tipo);
+
+      // Sección 17: si no hay una categoría que matchee razonablemente, NO caer en "Otros"
+      // en silencio — pedirle a la IA que confirme con el usuario antes de crear una nueva.
+      if (!categoria && !input.categoria_confirmada) {
+        return {
+          requiere_confirmacion_categoria: true,
+          categoria_sugerida: input.categoria,
+          mensaje_para_el_usuario: `No encontré la categoría "${input.categoria}". ¿Querés que cree esa categoría nueva, o preferís usar otra existente?`,
+        };
+      }
+
       const { data: cuentas } = await supabase.from("accounts").select("id, nombre").eq("workspace_id", workspaceId).eq("activa", true);
       if (!cuentas || cuentas.length === 0) return { error: "El usuario no tiene ninguna cuenta creada todavía. Pedile que cree una cuenta primero." };
-      const cuenta = (input.cuenta && cuentas.find((c: any) => c.nombre.toLowerCase().includes(String(input.cuenta).toLowerCase()))) ?? cuentas[0];
+
+      // Sección 15/18: cuenta predeterminada > cuenta mencionada por el usuario > única cuenta disponible.
+      const predeterminadaId = await obtenerCuentaPredeterminada(input.tipo);
+      const cuentaPredeterminada = predeterminadaId ? cuentas.find((c: any) => c.id === predeterminadaId) : null;
+      const cuentaMencionada = input.cuenta && cuentas.find((c: any) => c.nombre.toLowerCase().includes(String(input.cuenta).toLowerCase()));
+
+      if (!cuentaMencionada && !cuentaPredeterminada && cuentas.length > 1) {
+        return {
+          requiere_eleccion_cuenta: true,
+          cuentas_disponibles: cuentas.map((c: any) => c.nombre),
+          mensaje_para_el_usuario: "¿Con qué cuenta fue? " + cuentas.map((c: any) => c.nombre).join(", "),
+        };
+      }
+
+      const cuenta = cuentaMencionada || cuentaPredeterminada || cuentas[0];
+
+      // Categoría nueva confirmada por el usuario: crearla recién ahora.
+      let categoriaFinal = categoria;
+      if (!categoriaFinal && input.categoria_confirmada) {
+        const { data: nuevaCategoria } = await supabase
+          .from("transaction_categories")
+          .insert({ user_id: userId, workspace_tipo: workspaceTipo, nombre: input.categoria, tipo: input.tipo })
+          .select()
+          .single();
+        categoriaFinal = nuevaCategoria;
+      }
 
       const { data: nuevoMov, error } = await supabase
         .from("transactions")
@@ -317,7 +368,7 @@ export async function procesarMensajeIA({
           user_id: userId,
           workspace_id: workspaceId,
           account_id: cuenta.id,
-          category_id: categoria?.id ?? null,
+          category_id: categoriaFinal?.id ?? null,
           tipo: input.tipo,
           monto: input.monto,
           fecha: input.fecha || new Date().toISOString().slice(0, 10),
@@ -328,10 +379,10 @@ export async function procesarMensajeIA({
         .single();
 
       if (error) return { error: "No se pudo registrar el movimiento." };
-      await auditar("ia_creo_transaccion", { transaction_id: nuevoMov.id, monto: input.monto, categoria: categoria?.nombre, origen });
+      await auditar("ia_creo_transaccion", { transaction_id: nuevoMov.id, monto: input.monto, categoria: categoriaFinal?.nombre, origen });
 
-      accionRealizada = { tipo: "transaccion_creada", monto: input.monto, moneda: "PYG", categoria: categoria?.nombre ?? "Otros", cuenta: cuenta.nombre, tipoMovimiento: input.tipo };
-      return { ok: true, transaction_id: nuevoMov.id, categoria: categoria?.nombre ?? "Otros", cuenta: cuenta.nombre, fecha: nuevoMov.fecha };
+      accionRealizada = { tipo: "transaccion_creada", monto: input.monto, moneda: "PYG", categoria: categoriaFinal?.nombre ?? input.categoria, cuenta: cuenta.nombre, tipoMovimiento: input.tipo };
+      return { ok: true, transaction_id: nuevoMov.id, categoria: categoriaFinal?.nombre ?? input.categoria, cuenta: cuenta.nombre, fecha: nuevoMov.fecha };
     }
 
     if (nombre === "create_budget") {
@@ -445,13 +496,26 @@ export async function procesarMensajeIA({
   const canalTexto = origen === "whatsapp" ? " (por WhatsApp, texto)" : origen === "audio" ? " (por WhatsApp, nota de voz transcripta — puede tener errores de transcripción, usá el sentido común)" : "";
 
   const systemPrompt = `Sos el asistente financiero de CONTROL IA${canalTexto}. Ayudás al usuario a registrar y entender su dinero, en el espacio de trabajo "${workspaceTipo}".
+
 Reglas estrictas:
 - NUNCA inventes montos, saldos, porcentajes ni comparaciones. Para cualquier dato financiero, llamá siempre a la herramienta correspondiente y explicá el resultado real devuelto.
 - Si no hay datos suficientes para responder algo, decilo explícitamente.
 - Para registrar un movimiento, presupuesto, deuda o venta, llamá a la herramienta correspondiente. Si falta un dato esencial, preguntá antes de inventarlo.
+- Si create_transaction responde "requiere_confirmacion_categoria": preguntale al usuario si querés crear esa categoría nueva o prefiere usar otra existente. Recién si confirma que sí, volvé a llamar create_transaction con categoria_confirmada: true. NUNCA crees una categoría nueva sin esa confirmación explícita.
+- Si create_transaction responde "requiere_eleccion_cuenta": preguntale con cuál de esas cuentas fue, y esperá su respuesta antes de reintentar.
 - IMPORTANTE — acciones sensibles: antes de llamar a update_transaction o delete_transaction, si no es 100% claro a qué movimiento se refiere el usuario, usá get_transactions para mostrarle las opciones y esperá su confirmación explícita en un mensaje antes de ejecutar el cambio.
 - Sé breve, cercano y en español paraguayo/rioplatense. Usá "Gs." para guaraníes.
-- Si acabás de registrar o corregir un movimiento, confirmalo con los datos reales devueltos por la herramienta.`;
+- Si acabás de registrar o corregir un movimiento, confirmalo con los datos reales devueltos por la herramienta.
+
+Expresiones de monto en guaraníes que debés interpretar correctamente:
+- "85 mil", "85.000", "85000" → 85000
+- "200 mil" → 200000
+- "1 millón" → 1000000
+- "1 palo" es ambiguo (puede ser mil o millón según el contexto/región) — NUNCA lo registres directo, confirmá primero: "¿Te referís a Gs. 1.000.000?"
+- Si el monto queda ambiguo por cualquier motivo (ej. "120 de súper" sin aclarar si son 120.000 o 120 mil), confirmá el monto exacto antes de registrar.
+
+Categorías y alias comunes en Paraguay (usalos para entender, pero segui usando resolverCategoria/las categorías reales del usuario — no está hardcodeado, es orientativo):
+Super/Súper/Supermercado → Supermercado · Nafta/Combustible → Combustible · ANDE/ESSAP/Internet → Servicios · Delivery → Delivery · Publicidad → Publicidad · Iglesia/Diezmo/Ofrenda → categorías propias del usuario (si no existen, seguí la regla de confirmación de categoría nueva).`;
 
   let respuesta = await llamarAnthropicSeguro({ model: MODELO, max_tokens: 800, system: systemPrompt, tools: TOOLS, messages });
 
