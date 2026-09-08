@@ -1,5 +1,6 @@
 "use client";
 
+import { hoyParaguay } from "@/lib/utils/fecha";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -23,7 +24,7 @@ export default function NuevaCompraPage() {
   const [importe, setImporte] = useState(0);
   const [estadoPago, setEstadoPago] = useState<"pagado" | "pendiente">("pagado");
   const [cuentaId, setCuentaId] = useState("");
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => hoyParaguay());
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
@@ -166,6 +167,9 @@ export default function NuevaCompraPage() {
         <div>
           <label className="text-sm font-medium mb-1 block">Concepto</label>
           <input className="input" value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Ej. Mercadería, insumos..." />
+          <p className="text-xs text-amber-600 -mt-2">
+            ⚠️ Si esta compra es mercadería que después vas a revender, cargá su costo en "Ventas" al momento de venderla, no acá — evitá restarlo dos veces (una como Compra y otra como Costo de la venta). Usá esta pantalla solo para gastos operativos del negocio.
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">

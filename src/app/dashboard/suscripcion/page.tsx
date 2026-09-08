@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { subirComprobante } from "@/lib/supabase/comprobantes";
 import { formatMoney } from "@/lib/utils/currency";
@@ -9,7 +11,17 @@ type Suscripcion = { estado: string; fecha_fin: string | null };
 type PagoQR = { titular: string; banco: string; cuenta: string; instrucciones: string; qr_url: string | null; precio_mensual: number };
 
 export default function SuscripcionPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-black/40">Cargando...</div>}>
+      <SuscripcionContenido />
+    </Suspense>
+  );
+}
+
+function SuscripcionContenido() {
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  const llegoBloqueado = searchParams.get("vencida") === "1";
   const [suscripcion, setSuscripcion] = useState<Suscripcion | null>(null);
   const [configQr, setConfigQr] = useState<PagoQR | null>(null);
   const [mostrarPago, setMostrarPago] = useState(false);
@@ -65,6 +77,13 @@ export default function SuscripcionPage() {
   return (
     <div className="max-w-lg flex flex-col gap-4">
       <h1 className="text-lg font-semibold">Mi suscripción</h1>
+
+      {llegoBloqueado && (
+        <div className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-800">
+          <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+          <span>Tu período de prueba/suscripción venció. Tus datos siguen guardados y seguros — renová para volver a acceder a tu panel.</span>
+        </div>
+      )}
 
       <div className="card p-5">
         <div className="flex items-center justify-between mb-1">

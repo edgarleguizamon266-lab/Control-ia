@@ -43,6 +43,21 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Bloqueo real por suscripción vencida (decisión explícita del dueño del
+  // producto: 1 mes gratis, después se bloquea el panel hasta que se
+  // apruebe un nuevo pago). Nunca bloquea /dashboard/suscripcion — ahí
+  // es donde el usuario tiene que poder ir a pagar. El super_admin nunca
+  // se bloquea a sí mismo.
+  if (user && path.startsWith("/dashboard") && path !== "/dashboard/suscripcion") {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    if (profile?.role !== "super_admin") {
+      const { data: suscripcion } = await supabase.rpc("fn_mi_suscripcion").maybeSingle();
+      if ((suscripcion as any)?.estado === "vencido") {
+        return NextResponse.redirect(new URL("/dashboard/suscripcion?vencida=1", request.url));
+      }
+    }
+  }
+
   if (user && esRutaAuth) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }

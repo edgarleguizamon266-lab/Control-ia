@@ -190,8 +190,9 @@ export async function getDeudaPagadoAcumulado(supabase: SupabaseClient, deudaId:
   return Number(data ?? 0);
 }
 
-export function primerYUltimoDiaDelMes(fecha = new Date()) {
-  const desde = new Date(fecha.getFullYear(), fecha.getMonth(), 1).toISOString().slice(0, 10);
-  const hasta = fecha.toISOString().slice(0, 10);
-  return { desde, hasta };
+import { primerYUltimoDiaDelMesParaguay } from "@/lib/utils/fecha";
+
+/** Primer y último día (hoy) del mes actual, según el calendario de Paraguay (Fase 4.1). */
+export function primerYUltimoDiaDelMes() {
+  return primerYUltimoDiaDelMesParaguay();
 }
