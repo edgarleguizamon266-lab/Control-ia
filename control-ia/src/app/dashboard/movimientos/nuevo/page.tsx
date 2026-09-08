@@ -1,5 +1,6 @@
 "use client";
 
+import { hoyParaguay } from "@/lib/utils/fecha";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Sparkles } from "lucide-react";
@@ -46,7 +47,7 @@ function NuevoMovimientoForm() {
   const [monto, setMonto] = useState(0);
   const [categoriaId, setCategoriaId] = useState("");
   const [cuentaId, setCuentaId] = useState("");
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => hoyParaguay());
   const [descripcion, setDescripcion] = useState("");
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [comprobanteHash, setComprobanteHash] = useState<string | null>(null);

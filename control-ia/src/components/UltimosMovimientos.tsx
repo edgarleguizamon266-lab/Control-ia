@@ -1,5 +1,6 @@
 "use client";
 
+import { hoyParaguay, fechaParaguay } from "@/lib/utils/fecha";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
@@ -10,8 +11,8 @@ import { getMovimientosEnriquecidos, type MovimientoEnriquecido } from "@/lib/fi
 import ModalDetalleMovimiento from "@/components/ModalDetalleMovimiento";
 
 function etiquetaFecha(fecha: string) {
-  const hoy = new Date().toISOString().slice(0, 10);
-  const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const hoy = hoyParaguay();
+  const ayer = fechaParaguay(new Date(Date.now() - 86400000));
   if (fecha === hoy) return "Hoy";
   if (fecha === ayer) return "Ayer";
   return new Date(fecha).toLocaleDateString("es-PY", { day: "numeric", month: "short" });

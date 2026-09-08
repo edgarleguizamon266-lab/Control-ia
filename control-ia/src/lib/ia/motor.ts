@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { rangoPeriodoParaguay, hoyParaguay, primerYUltimoDiaDelMesParaguay } from "@/lib/utils/fecha";
 import {
   getAccountsWithBalance,
   getWorkspaceBalance,
@@ -7,7 +8,6 @@ import {
   getBudgetUsage,
   getBusinessSummary,
   getDebtTotals,
-  primerYUltimoDiaDelMes,
 } from "@/lib/financial-engine";
 
 // =========================================================
@@ -127,22 +127,6 @@ const TOOLS: Anthropic.Tool[] = [
   },
 ];
 
-function rangoDePeriodo(periodo: string) {
-  const hoy = new Date();
-  if (periodo === "mes_pasado") {
-    const inicio = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
-    const fin = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
-    return { desde: inicio.toISOString().slice(0, 10), hasta: fin.toISOString().slice(0, 10) };
-  }
-  if (periodo === "esta_semana") {
-    const dia = hoy.getDay() || 7;
-    const inicio = new Date(hoy);
-    inicio.setDate(hoy.getDate() - dia + 1);
-    return { desde: inicio.toISOString().slice(0, 10), hasta: hoy.toISOString().slice(0, 10) };
-  }
-  const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-  return { desde: inicio.toISOString().slice(0, 10), hasta: hoy.toISOString().slice(0, 10) };
-}
 
 export type OrigenMensaje = "app" | "whatsapp" | "audio";
 
@@ -289,7 +273,7 @@ export async function procesarMensajeIA({
     }
 
     if (nombre === "get_report") {
-      const { desde, hasta } = rangoDePeriodo(input.periodo);
+      const { desde, hasta } = rangoPeriodoParaguay(input.periodo === "este_mes" ? "este_mes" : input.periodo === "mes_pasado" ? "mes_pasado" : "esta_semana");
       const reporte = await getPeriodReport(supabase, workspaceId, desde, hasta);
       return { periodo: input.periodo, ingresos: reporte.ingresos, gastos: reporte.gastos, disponible: reporte.ingresos - reporte.gastos, gastos_por_categoria: reporte.gastos_por_categoria };
     }
@@ -308,7 +292,7 @@ export async function procesarMensajeIA({
     }
 
     if (nombre === "get_business_summary") {
-      const { desde, hasta } = primerYUltimoDiaDelMes();
+      const { desde, hasta } = primerYUltimoDiaDelMesParaguay();
       return await getBusinessSummary(supabase, workspaceId, desde, hasta);
     }
 
@@ -376,7 +360,7 @@ export async function procesarMensajeIA({
           category_id: categoriaFinal?.id ?? null,
           tipo: input.tipo,
           monto: input.monto,
-          fecha: input.fecha || new Date().toISOString().slice(0, 10),
+          fecha: input.fecha || hoyParaguay(),
           descripcion: input.descripcion || null,
           origen: origen === "audio" ? "ia_audio" : origen === "whatsapp" ? "ia_whatsapp" : "ia_texto",
         })
@@ -434,7 +418,7 @@ export async function procesarMensajeIA({
             category_id: categoriaVentas?.id ?? null,
             tipo: "ingreso",
             monto: input.monto,
-            fecha: input.fecha || new Date().toISOString().slice(0, 10),
+            fecha: input.fecha || hoyParaguay(),
             descripcion: input.producto || "Venta",
             origen: origen === "whatsapp" || origen === "audio" ? "ia_whatsapp" : "ia_texto",
           })
@@ -456,7 +440,7 @@ export async function procesarMensajeIA({
           account_id: cuentaUsada?.id ?? null,
           transaction_id: transactionId,
           estado_pago: formaPago === "contado" ? "pagado" : "pendiente",
-          fecha: input.fecha || new Date().toISOString().slice(0, 10),
+          fecha: input.fecha || hoyParaguay(),
         })
         .select()
         .single();

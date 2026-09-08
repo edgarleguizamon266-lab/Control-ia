@@ -1,5 +1,6 @@
 "use client";
 
+import { hoyParaguay } from "@/lib/utils/fecha";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -23,7 +24,7 @@ export default function NuevaCompraPage() {
   const [importe, setImporte] = useState(0);
   const [estadoPago, setEstadoPago] = useState<"pagado" | "pendiente">("pagado");
   const [cuentaId, setCuentaId] = useState("");
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => hoyParaguay());
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);

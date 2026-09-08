@@ -1,5 +1,6 @@
 "use client";
 
+import { hoyParaguay, fechaParaguay } from "@/lib/utils/fecha";
 import Link from "next/link";
 import { X, HandCoins } from "lucide-react";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -15,8 +16,8 @@ const ORIGEN_LABEL: Record<string, string> = {
 };
 
 function etiquetaFecha(fecha: string) {
-  const hoy = new Date().toISOString().slice(0, 10);
-  const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const hoy = hoyParaguay();
+  const ayer = fechaParaguay(new Date(Date.now() - 86400000));
   if (fecha === hoy) return "Hoy";
   if (fecha === ayer) return "Ayer";
   return new Date(fecha).toLocaleDateString("es-PY", { day: "numeric", month: "short", year: "numeric" });

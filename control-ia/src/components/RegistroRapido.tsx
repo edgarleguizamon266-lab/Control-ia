@@ -1,5 +1,6 @@
 "use client";
 
+import { hoyParaguay } from "@/lib/utils/fecha";
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -24,7 +25,7 @@ export default function RegistroRapido({ onGuardado }: { onGuardado: () => void 
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [mostrarDetalles, setMostrarDetalles] = useState(false);
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => hoyParaguay());
   const [descripcion, setDescripcion] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [confirmacion, setConfirmacion] = useState<{ monto: number; categoria: string; cuenta: string } | null>(null);

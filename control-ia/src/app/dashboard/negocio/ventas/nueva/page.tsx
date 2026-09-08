@@ -1,5 +1,6 @@
 "use client";
 
+import { hoyParaguay } from "@/lib/utils/fecha";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -29,7 +30,7 @@ export default function NuevaVentaPage() {
   const [costo, setCosto] = useState(0);
   const [formaPago, setFormaPago] = useState<"contado" | "credito">("contado");
   const [cuentaId, setCuentaId] = useState("");
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => hoyParaguay());
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [error, setError] = useState<string | null>(null);
