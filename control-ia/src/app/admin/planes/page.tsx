@@ -27,6 +27,7 @@ export default function AdminPlanesPage() {
   }, []);
 
   async function agregar() {
+    if (guardando) return; // evita doble registro (doble tap / doble clic)
     if (!nombre || !precio) return;
     setGuardando(true);
     await supabase.from("subscription_plans").insert({ nombre, precio_mensual: precio, limite_operaciones_ia: limiteIA });

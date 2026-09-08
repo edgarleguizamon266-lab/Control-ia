@@ -62,6 +62,7 @@ export default function EditarMovimientoPage() {
   }, [workspaceActual, tipo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function guardar() {
+    if (guardando) return; // evita doble registro (doble tap / doble clic)
     setError(null);
     if (!monto || !cuentaId || !categoriaId) {
       setError("Completá monto, categoría y cuenta.");

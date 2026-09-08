@@ -41,6 +41,7 @@ export default function ClientesPage() {
   }, [negocio]);
 
   async function agregar() {
+    if (guardando) return; // evita doble registro (doble tap / doble clic)
     if (!negocio || !nombre) return;
     setGuardando(true);
     const {

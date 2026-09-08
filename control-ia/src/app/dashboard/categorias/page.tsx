@@ -31,6 +31,7 @@ export default function CategoriasPage() {
   }, [workspaceActual]);
 
   async function agregar() {
+    if (guardando) return; // evita doble registro (doble tap / doble clic)
     if (!workspaceActual || !nombre) return;
     setGuardando(true);
     const {

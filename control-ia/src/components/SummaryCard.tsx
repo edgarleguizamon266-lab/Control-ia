@@ -8,18 +8,22 @@ export default function SummaryCard({
   moneda = "PYG",
   variacion,
   colorTexto = "text-ink",
+  esCantidad = false,
 }: {
   titulo: string;
   monto: number;
   moneda?: string;
   variacion?: number; // % vs mes anterior, positivo o negativo
   colorTexto?: string;
+  esCantidad?: boolean; // true = es un conteo (ej. "5 movimientos"), no dinero — nunca lleva decimales ni símbolo
 }) {
   const { mostrarSaldos } = useWorkspace();
   return (
     <div className="card p-4">
       <div className="text-sm text-black/50">{titulo}</div>
-      <div className={`text-xl font-semibold mt-1 ${colorTexto}`}>{formatMoney(monto, moneda, !mostrarSaldos)}</div>
+      <div className={`text-xl font-semibold mt-1 ${colorTexto}`}>
+        {esCantidad ? monto.toLocaleString("es-PY") : formatMoney(monto, moneda, !mostrarSaldos)}
+      </div>
       {typeof variacion === "number" && (
         <div className={`flex items-center gap-1 text-xs mt-1 ${variacion >= 0 ? "text-brand-600" : "text-red-500"}`}>
           {variacion >= 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}

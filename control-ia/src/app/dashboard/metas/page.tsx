@@ -34,6 +34,7 @@ export default function MetasPage() {
   }, [workspaceActual]);
 
   async function agregar() {
+    if (guardando) return; // evita doble registro (doble tap / doble clic)
     if (!workspaceActual || !nombre || !objetivo) return;
     setGuardando(true);
     const {

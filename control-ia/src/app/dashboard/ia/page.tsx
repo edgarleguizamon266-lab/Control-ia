@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot } from "lucide-react";
+import Link from "next/link";
+import { Send, Bot, AlertTriangle, RotateCcw, PenLine } from "lucide-react";
 import { useWorkspace } from "@/lib/workspace-context";
 import { formatMoney } from "@/lib/utils/currency";
 
-type Mensaje = { rol: "usuario" | "ia"; texto: string };
+type Mensaje = { rol: "usuario" | "ia" | "error"; texto: string };
 
 const SUGERENCIAS = [
   "Gasté 85 mil en supermercado",
@@ -22,6 +23,7 @@ export default function IaPage() {
   ]);
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [ultimoMensajeFallido, setUltimoMensajeFallido] = useState<string | null>(null);
   const [historialApi, setHistorialApi] = useState<any[]>([]);
   const finRef = useRef<HTMLDivElement>(null);
 
@@ -31,11 +33,12 @@ export default function IaPage() {
 
   async function enviar(msg?: string) {
     const contenido = (msg ?? texto).trim();
-    if (!contenido || !workspaceActual) return;
+    if (!contenido || !workspaceActual || enviando) return; // protección contra doble envío
 
     setMensajes((m) => [...m, { rol: "usuario", texto: contenido }]);
     setTexto("");
     setEnviando(true);
+    setUltimoMensajeFallido(null);
 
     try {
       const res = await fetch("/api/ia", {
@@ -51,7 +54,9 @@ export default function IaPage() {
       const data = await res.json();
 
       if (data.error) {
-        setMensajes((m) => [...m, { rol: "ia", texto: data.error }]);
+        // El backend ya sanitiza el mensaje (nunca JSON crudo del proveedor) — acá solo lo mostramos distinto.
+        setMensajes((m) => [...m, { rol: "error", texto: data.error }]);
+        setUltimoMensajeFallido(contenido);
       } else {
         let texto = data.respuesta || "Listo.";
         const a = data.accion;
@@ -70,7 +75,8 @@ export default function IaPage() {
         setHistorialApi(data.historial ?? []);
       }
     } catch {
-      setMensajes((m) => [...m, { rol: "ia", texto: "Hubo un problema de conexión. Intentá de nuevo." }]);
+      setMensajes((m) => [...m, { rol: "error", texto: "Hubo un problema de conexión. Probá de nuevo." }]);
+      setUltimoMensajeFallido(contenido);
     } finally {
       setEnviando(false);
     }
@@ -93,23 +99,53 @@ export default function IaPage() {
       </div>
 
       <div className="flex-1 card p-4 overflow-y-auto flex flex-col gap-3">
-        {mensajes.map((m, i) => (
-          <div
-            key={i}
-            className={`max-w-[80%] whitespace-pre-line text-sm px-3 py-2 rounded-xl ${
-              m.rol === "usuario" ? "self-end bg-brand-600 text-white" : "self-start bg-brand-100 text-ink"
-            }`}
-          >
-            {m.texto}
-          </div>
-        ))}
+        {mensajes.map((m, i) => {
+          if (m.rol === "error") {
+            const esUltimoError = i === mensajes.length - 1;
+            return (
+              <div key={i} className="self-start max-w-[90%] flex flex-col gap-2">
+                <div className="flex items-start gap-2 text-sm px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
+                  <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                  <span>{m.texto}</span>
+                </div>
+                {esUltimoError && ultimoMensajeFallido && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => enviar(ultimoMensajeFallido)}
+                      disabled={enviando}
+                      className="flex items-center gap-1.5 text-xs bg-white border border-black/10 rounded-full px-3 py-1.5 hover:border-brand-500"
+                    >
+                      <RotateCcw size={12} /> Reintentar
+                    </button>
+                    <Link
+                      href="/dashboard/movimientos/nuevo"
+                      className="flex items-center gap-1.5 text-xs bg-white border border-black/10 rounded-full px-3 py-1.5 hover:border-brand-500"
+                    >
+                      <PenLine size={12} /> Registrar manualmente
+                    </Link>
+                  </div>
+                )}
+              </div>
+            );
+          }
+          return (
+            <div
+              key={i}
+              className={`max-w-[80%] whitespace-pre-line text-sm px-3 py-2 rounded-xl ${
+                m.rol === "usuario" ? "self-end bg-brand-600 text-white" : "self-start bg-brand-100 text-ink"
+              }`}
+            >
+              {m.texto}
+            </div>
+          );
+        })}
         {enviando && <div className="self-start text-xs text-black/40">Escribiendo...</div>}
         <div ref={finRef} />
       </div>
 
       <div className="flex gap-2 mt-3 flex-wrap">
         {SUGERENCIAS.map((s) => (
-          <button key={s} onClick={() => enviar(s)} className="text-xs bg-white border border-black/10 rounded-full px-3 py-1.5 hover:border-brand-500">
+          <button key={s} onClick={() => enviar(s)} disabled={enviando} className="text-xs bg-white border border-black/10 rounded-full px-3 py-1.5 hover:border-brand-500 disabled:opacity-50">
             {s}
           </button>
         ))}
@@ -122,8 +158,9 @@ export default function IaPage() {
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && enviar()}
+          disabled={enviando}
         />
-        <button onClick={() => enviar()} disabled={enviando} className="btn-primary px-4">
+        <button onClick={() => enviar()} disabled={enviando || !texto.trim()} className="btn-primary px-4">
           <Send size={18} />
         </button>
       </div>

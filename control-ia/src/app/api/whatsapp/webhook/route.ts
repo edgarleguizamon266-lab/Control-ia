@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { procesarMensajeIA } from "@/lib/ia/motor";
+import { procesarMensajeIA, ErrorMotorIA } from "@/lib/ia/motor";
 import { getWhatsappProvider, credencialesWhatsappCompletas } from "@/lib/whatsapp/provider";
 import { getTranscriptionProvider, transcripcionDisponible } from "@/lib/transcription/provider";
 
@@ -122,7 +122,9 @@ export async function POST(req: Request) {
 
           await responderSiPosible(phoneNumberId, remitente, textoRespuesta);
         } catch (e: any) {
-          await responderSiPosible(phoneNumberId, remitente, "Tuve un problema técnico procesando tu mensaje. Probá de nuevo en un momento.");
+          const mensaje = e instanceof ErrorMotorIA ? e.amigable : "Tuve un problema técnico procesando tu mensaje. Probá de nuevo en un momento.";
+          if (!(e instanceof ErrorMotorIA)) console.error("[whatsapp-webhook] Error inesperado:", e);
+          await responderSiPosible(phoneNumberId, remitente, mensaje);
         }
       }
     }

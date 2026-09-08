@@ -35,6 +35,7 @@ export default function PresupuestosPage() {
   }, [workspaceActual]);
 
   async function agregar() {
+    if (guardando) return; // evita doble registro (doble tap / doble clic)
     if (!workspaceActual || !categoriaId || !monto) return;
     setGuardando(true);
     const {

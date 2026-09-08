@@ -35,6 +35,7 @@ export default function TransferenciaPage() {
   }, [workspaceActual]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function guardar() {
+    if (guardando) return; // evita doble registro (doble tap / doble clic)
     if (!workspaceActual) return;
     setError(null);
 

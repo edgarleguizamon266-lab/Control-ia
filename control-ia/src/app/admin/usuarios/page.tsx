@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 type Usuario = {
@@ -26,6 +27,7 @@ const BADGE: Record<string, string> = {
 
 export default function AdminUsuariosPage() {
   const supabase = createClient();
+  const router = useRouter();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(true);
@@ -86,7 +88,11 @@ export default function AdminUsuariosPage() {
               <tr><td colSpan={7} className="p-4 text-center text-black/40">Sin resultados.</td></tr>
             )}
             {filtrados.map((u) => (
-              <tr key={u.id} className="border-b border-black/5 last:border-0">
+              <tr
+                key={u.id}
+                className="border-b border-black/5 last:border-0 cursor-pointer hover:bg-brand-100/40"
+                onClick={() => router.push(`/admin/usuarios/${u.id}`)}
+              >
                 <td className="p-3">{u.nombre} {u.apellido}{u.role === "super_admin" && <span className="ml-1 text-xs text-brand-600">(admin)</span>}</td>
                 <td className="p-3 text-black/60">{u.email}</td>
                 <td className="p-3 text-black/60">{u.whatsapp ?? "—"}</td>
@@ -98,7 +104,7 @@ export default function AdminUsuariosPage() {
                 <td className="p-3 text-black/60">{u.suscripcion_vencimiento ? new Date(u.suscripcion_vencimiento).toLocaleDateString("es-PY") : "—"}</td>
                 <td className="p-3 text-black/60">{u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleDateString("es-PY") : "—"}</td>
                 <td className="p-3">
-                  <div className="flex gap-1 flex-wrap">
+                  <div className="flex gap-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
                     <button className="text-xs text-brand-600 hover:underline" onClick={() => actualizar(u.id, "activo")}>Activar</button>
                     <button className="text-xs text-amber-600 hover:underline" onClick={() => actualizar(u.id, "suspendido")}>Suspender</button>
                     <button className="text-xs text-black/60 hover:underline" onClick={() => actualizar(u.id, undefined, 30)}>+30 días</button>

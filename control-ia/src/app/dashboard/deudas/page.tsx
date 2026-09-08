@@ -42,6 +42,7 @@ export default function DeudasPage() {
   }, [workspaceActual]);
 
   async function agregar() {
+    if (guardando) return; // evita doble registro (doble tap / doble clic)
     if (!workspaceActual || !persona || !monto) return;
     setGuardando(true);
     const {

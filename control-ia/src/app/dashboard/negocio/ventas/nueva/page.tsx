@@ -49,6 +49,7 @@ export default function NuevaVentaPage() {
   }, [negocio]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function guardar() {
+    if (guardando) return; // evita doble registro (doble tap / doble clic)
     if (!negocio) return;
     setError(null);
 

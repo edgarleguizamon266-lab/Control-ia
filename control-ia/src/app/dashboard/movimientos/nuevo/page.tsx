@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { subirComprobante } from "@/lib/supabase/comprobantes";
 import { useWorkspace } from "@/lib/workspace-context";
 import { parseMoneyInput, formatMoney } from "@/lib/utils/currency";
 
@@ -114,6 +115,7 @@ function NuevoMovimientoForm() {
   }
 
   async function guardar() {
+    if (guardando) return; // evita doble registro (doble tap / doble clic)
     if (!workspaceActual) return;
     setError(null);
 
@@ -130,11 +132,7 @@ function NuevoMovimientoForm() {
 
     let comprobante_url: string | null = null;
     if (comprobante && user) {
-      const path = `${user.id}/${Date.now()}-${comprobante.name}`;
-      const { data: subida, error: errSubida } = await supabase.storage.from("comprobantes").upload(path, comprobante);
-      if (!errSubida && subida) {
-        comprobante_url = supabase.storage.from("comprobantes").getPublicUrl(subida.path).data.publicUrl;
-      }
+      comprobante_url = await subirComprobante(supabase, user.id, comprobante);
     }
 
     const { error: errInsert } = await supabase.from("transactions").insert({

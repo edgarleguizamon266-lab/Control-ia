@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { PlusCircle, ArrowUpCircle, Camera, MessageSquareText, BarChart3, LucideIcon } from "lucide-react";
+import { Camera, MessageSquareText, BarChart3, LucideIcon } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -19,6 +19,8 @@ import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { formatMoney } from "@/lib/utils/currency";
 import SummaryCard from "@/components/SummaryCard";
+import RegistroRapido from "@/components/RegistroRapido";
+import UltimosMovimientos from "@/components/UltimosMovimientos";
 import {
   getPeriodReport,
   getPeriodReportMulti,
@@ -43,6 +45,7 @@ export default function DashboardPage() {
   const [disponible, setDisponible] = useState(0);
   const [movimientosDelMes, setMovimientosDelMes] = useState(0);
   const [cargando, setCargando] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (cargandoWorkspace) return;
@@ -77,7 +80,7 @@ export default function DashboardPage() {
       setMovimientosDelMes(count ?? 0);
       setCargando(false);
     })();
-  }, [seleccion, workspaceActual, workspaces, cargandoWorkspace]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [seleccion, workspaceActual, workspaces, cargandoWorkspace, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { movsPorMes, gastosPorCategoria } = useMemo(() => {
     const mesActual = new Date().getMonth();
@@ -98,76 +101,137 @@ export default function DashboardPage() {
   }
 
   if (seleccion !== "todos" && !workspaceActual) {
-    return (
-      <div className="card p-8 text-center text-black/60">
-        Todavía no configuraste este espacio de trabajo.
-      </div>
-    );
+    return <ConfigurarNegocio />;
   }
 
+  const hayMovimientosEsteMes = movimientosDelMes > 0;
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
+      {/* 1. Resumen financiero compacto */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <SummaryCard titulo="Ingresos este mes" monto={ingresosMes} moneda={moneda} colorTexto="text-brand-600" />
         <SummaryCard titulo="Gastos este mes" monto={gastosMes} moneda={moneda} colorTexto="text-red-500" />
         <SummaryCard titulo="Disponible" monto={disponible} moneda={moneda} />
-        <SummaryCard titulo="Movimientos este mes" monto={movimientosDelMes} moneda="" />
+        <SummaryCard titulo="Movimientos este mes" monto={movimientosDelMes} esCantidad />
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="card p-5">
-          <div className="font-medium mb-4">Ingresos vs. Gastos</div>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={movsPorMes}>
-              <XAxis dataKey="mes" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-              <YAxis hide />
-              <Tooltip formatter={(v: number) => formatMoney(v, moneda)} />
-              <Bar dataKey="Ingresos" fill="#34c777" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Gastos" fill="#f87171" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      {/* 2. Registro rápido */}
+      <RegistroRapido onGuardado={() => setRefreshKey((k) => k + 1)} />
 
-        <div className="card p-5">
-          <div className="font-medium mb-4">Gastos por categoría (este mes)</div>
-          {gastosPorCategoria.length === 0 ? (
-            <div className="text-sm text-black/40 h-[260px] flex items-center justify-center">
-              Todavía no registraste gastos este mes.
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={gastosPorCategoria} dataKey="valor" nameKey="nombre" innerRadius={60} outerRadius={90}>
-                  {gastosPorCategoria.map((_, i) => (
-                    <Cell key={i} fill={COLORES[i % COLORES.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v: number) => formatMoney(v, moneda)} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
+      {/* 3. Últimos movimientos */}
+      <UltimosMovimientos refreshKey={refreshKey} />
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <AccionRapida href="/dashboard/movimientos/nuevo?tipo=gasto" icon={PlusCircle} label="Registrar gasto" />
-        <AccionRapida href="/dashboard/movimientos/nuevo?tipo=ingreso" icon={ArrowUpCircle} label="Registrar ingreso" />
-        <AccionRapida href="/dashboard/movimientos/nuevo?comprobante=1" icon={Camera} label="Subir comprobante" />
+      {/* 4. Acciones adicionales (compactas) */}
+      <div className="grid grid-cols-3 gap-3">
+        <AccionRapida href="/dashboard/movimientos/nuevo?comprobante=1" icon={Camera} label="Comprobante" />
         <AccionRapida href="/dashboard/ia" icon={MessageSquareText} label="Preguntar a la IA" />
-        <AccionRapida href="/dashboard/reportes" icon={BarChart3} label="Ver reportes" />
+        <AccionRapida href="/dashboard/reportes" icon={BarChart3} label="Reportes" />
       </div>
+
+      {/* 5. Gráficos — solo si hay datos este mes; si no, empty state compacto */}
+      {!hayMovimientosEsteMes ? (
+        <div className="card p-6 text-center flex flex-col items-center gap-3">
+          <p className="text-sm text-black/50">Todavía no registraste movimientos este mes.</p>
+          <p className="text-xs text-black/30">Usá el Registro rápido de arriba para cargar tu primer gasto o ingreso.</p>
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="card p-5">
+            <div className="font-medium mb-4">Ingresos vs. Gastos</div>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={movsPorMes}>
+                <XAxis dataKey="mes" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis hide />
+                <Tooltip formatter={(v: number) => formatMoney(v, moneda)} />
+                <Bar dataKey="Ingresos" fill="#34c777" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Gastos" fill="#f87171" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="card p-5">
+            <div className="font-medium mb-4">Gastos por categoría (este mes)</div>
+            {gastosPorCategoria.length === 0 ? (
+              <div className="text-sm text-black/40 h-[220px] flex items-center justify-center">Sin gastos este mes.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie data={gastosPorCategoria} dataKey="valor" nameKey="nombre" innerRadius={55} outerRadius={80}>
+                    {gastosPorCategoria.map((_, i) => (
+                      <Cell key={i} fill={COLORES[i % COLORES.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => formatMoney(v, moneda)} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function AccionRapida({ href, icon: Icon, label }: { href: string; icon: LucideIcon; label: string }) {
   return (
-    <Link href={href} className="card p-4 flex flex-col items-center gap-2 text-center hover:border-brand-500 border border-transparent transition">
-      <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center">
-        <Icon size={20} />
+    <Link href={href} className="card p-3 flex flex-col items-center gap-1.5 text-center hover:border-brand-500 border border-transparent transition">
+      <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center">
+        <Icon size={18} />
       </div>
-      <span className="text-sm font-medium">{label}</span>
+      <span className="text-xs font-medium">{label}</span>
     </Link>
+  );
+}
+
+// Sección 6 del prompt: nunca dejar una pantalla muerta. Si el usuario está
+// parado en "Negocio" pero todavía no tiene ese espacio configurado, ofrecer
+// una acción real (no un mensaje sin salida).
+function ConfigurarNegocio() {
+  const supabase = createClient();
+  const { setSeleccion } = useWorkspace();
+  const [creando, setCreando] = useState(false);
+
+  async function configurar() {
+    if (creando) return;
+    setCreando(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: nuevoWorkspace } = await supabase
+      .from("workspaces")
+      .insert({ user_id: user.id, tipo: "negocio", nombre: "Mi Negocio" })
+      .select()
+      .single();
+
+    if (nuevoWorkspace) {
+      await supabase.from("accounts").insert({
+        user_id: user.id,
+        workspace_id: nuevoWorkspace.id,
+        nombre: "Caja",
+        tipo: "caja_negocio",
+        saldo_inicial: 0,
+      });
+    }
+
+    setCreando(false);
+    setSeleccion("negocio");
+    window.location.reload(); // refresca el contexto de workspaces con el nuevo espacio
+  }
+
+  return (
+    <div className="card p-8 text-center flex flex-col items-center gap-3 max-w-md mx-auto">
+      <div className="text-lg font-semibold">Configurá tu negocio</div>
+      <p className="text-sm text-black/50">Separá tus ventas, compras y gastos comerciales de tus finanzas personales.</p>
+      <button onClick={configurar} disabled={creando} className="btn-primary">
+        {creando ? "Configurando..." : "Configurar mi negocio"}
+      </button>
+      <button onClick={() => setSeleccion("personal")} className="text-sm text-black/40">
+        Volver a Personal
+      </button>
+    </div>
   );
 }

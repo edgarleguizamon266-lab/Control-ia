@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { procesarMensajeIA } from "@/lib/ia/motor";
+import { procesarMensajeIA, ErrorMotorIA } from "@/lib/ia/motor";
 
 // Wrapper delgado: la lógica real vive en src/lib/ia/motor.ts, compartida
 // con el webhook de WhatsApp (mismo cerebro, distintos canales de entrada).
@@ -28,6 +28,12 @@ export async function POST(req: Request) {
     });
     return NextResponse.json(resultado);
   } catch (e: any) {
-    return NextResponse.json({ error: e.message ?? "Ocurrió un error al procesar el mensaje." }, { status: 500 });
+    // Nunca exponer el error técnico crudo del proveedor al cliente (hallazgo de auditoría).
+    if (e instanceof ErrorMotorIA) {
+      return NextResponse.json({ error: e.amigable, tipoError: "ia_no_disponible" }, { status: 503 });
+    }
+    console.error("[api/ia] Error inesperado:", e);
+    return NextResponse.json({ error: "No pude procesar tu mensaje ahora. Probá de nuevo en un momento." }, { status: 500 });
   }
 }
+

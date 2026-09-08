@@ -41,17 +41,45 @@ export default function MobileNav() {
     { href: "/dashboard/ia", label: "IA", icon: MessageSquareText },
   ];
 
-  const TODAS_LAS_SECCIONES = [
-    { href: "/dashboard/cuentas", label: "Cuentas", icon: Wallet },
-    { href: "/dashboard/tarjetas", label: "Tarjetas", icon: CreditCard },
-    { href: "/dashboard/presupuestos", label: "Presupuestos", icon: PiggyBank },
-    { href: "/dashboard/metas", label: "Metas", icon: Target },
-    { href: "/dashboard/deudas", label: "Deudas", icon: HandCoins },
-    { href: "/dashboard/reportes", label: "Reportes", icon: BarChart3 },
-    ...(tieneNegocio ? [{ href: "/dashboard/negocio", label: "Mi Negocio", icon: Store }] : []),
-    { href: "/dashboard/configuracion/whatsapp", label: "WhatsApp", icon: Settings },
-    { href: "/dashboard/suscripcion", label: "Suscripción", icon: Settings },
-    ...(esAdmin ? [{ href: "/admin", label: "Panel Admin", icon: ShieldCheck }] : []),
+  const GRUPOS_SECCIONES: { titulo: string; items: { href: string; label: string; icon: typeof Wallet }[] }[] = [
+    {
+      titulo: "Finanzas",
+      items: [
+        { href: "/dashboard/cuentas", label: "Cuentas", icon: Wallet },
+        { href: "/dashboard/tarjetas", label: "Tarjetas", icon: CreditCard },
+        { href: "/dashboard/presupuestos", label: "Presupuestos", icon: PiggyBank },
+        { href: "/dashboard/metas", label: "Metas", icon: Target },
+        { href: "/dashboard/deudas", label: "Deudas", icon: HandCoins },
+        { href: "/dashboard/reportes", label: "Reportes", icon: BarChart3 },
+      ],
+    },
+    ...(tieneNegocio
+      ? [
+          {
+            titulo: "Negocio",
+            items: [
+              { href: "/dashboard/negocio", label: "Mi Negocio", icon: Store },
+              { href: "/dashboard/negocio/clientes", label: "Clientes", icon: Wallet },
+              { href: "/dashboard/negocio/proveedores", label: "Proveedores", icon: Wallet },
+            ],
+          },
+        ]
+      : []),
+    {
+      titulo: "CONTROL IA",
+      items: [
+        { href: "/dashboard/ia", label: "Asistente", icon: MessageSquareText },
+        { href: "/dashboard/configuracion/whatsapp", label: "WhatsApp", icon: Settings },
+        { href: "/dashboard/movimientos/nuevo?comprobante=1", label: "Comprobantes", icon: Settings },
+      ],
+    },
+    {
+      titulo: "Cuenta",
+      items: [
+        { href: "/dashboard/suscripcion", label: "Suscripción", icon: Settings },
+        ...(esAdmin ? [{ href: "/admin", label: "Panel Admin", icon: ShieldCheck }] : []),
+      ],
+    },
   ];
 
   async function salir() {
@@ -93,21 +121,28 @@ export default function MobileNav() {
                 <X size={20} />
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              {TODAS_LAS_SECCIONES.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMenuAbierto(false)}
-                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-brand-100/60 text-center"
-                  >
-                    <Icon size={20} className="text-brand-600" />
-                    <span className="text-xs font-medium">{item.label}</span>
-                  </Link>
-                );
-              })}
+            <div className="flex flex-col gap-4">
+              {GRUPOS_SECCIONES.map((grupo) => (
+                <div key={grupo.titulo}>
+                  <div className="text-xs font-medium text-black/40 mb-2 uppercase tracking-wide">{grupo.titulo}</div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {grupo.items.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setMenuAbierto(false)}
+                          className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-brand-100/60 text-center"
+                        >
+                          <Icon size={20} className="text-brand-600" />
+                          <span className="text-xs font-medium">{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
             <button onClick={salir} className="flex items-center justify-center gap-2 w-full mt-4 p-3 rounded-xl text-red-500 text-sm font-medium border border-red-100">
               <LogOut size={16} /> Cerrar sesión

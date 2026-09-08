@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { subirComprobante } from "@/lib/supabase/comprobantes";
 import { formatMoney } from "@/lib/utils/currency";
 
 type Suscripcion = { estado: string; fecha_fin: string | null };
@@ -32,6 +33,7 @@ export default function SuscripcionPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function confirmarPago() {
+    if (subiendo) return;
     if (!comprobante) return;
     setSubiendo(true);
     const {
@@ -39,9 +41,7 @@ export default function SuscripcionPage() {
     } = await supabase.auth.getUser();
     if (!user) return;
 
-    const path = `${user.id}/${Date.now()}-${comprobante.name}`;
-    const { data: subida } = await supabase.storage.from("comprobantes").upload(path, comprobante);
-    const comprobante_url = subida ? supabase.storage.from("comprobantes").getPublicUrl(subida.path).data.publicUrl : null;
+    const comprobante_url = await subirComprobante(supabase, user.id, comprobante);
 
     await supabase.from("payments").insert({
       user_id: user.id,
