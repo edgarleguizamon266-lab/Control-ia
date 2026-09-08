@@ -5,11 +5,13 @@ import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { formatMoney, parseMoneyInput } from "@/lib/utils/currency";
+import ModalMontoCuenta from "@/components/ModalMontoCuenta";
 
 type Deuda = {
   id: string;
   tipo: "yo_debo" | "me_deben";
   persona: string;
+  nombre: string | null;
   monto_total: number;
   saldo_pendiente: number;
   fecha_vencimiento: string | null;
@@ -22,15 +24,17 @@ export default function DeudasPage() {
   const [tab, setTab] = useState<"yo_debo" | "me_deben">("yo_debo");
   const [mostrarForm, setMostrarForm] = useState(false);
   const [persona, setPersona] = useState("");
+  const [nombreDeuda, setNombreDeuda] = useState("");
   const [monto, setMonto] = useState(0);
   const [vencimiento, setVencimiento] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [deudaParaPagar, setDeudaParaPagar] = useState<Deuda | null>(null);
 
   async function cargar() {
     if (!workspaceActual) return;
     const { data } = await supabase
       .from("debts")
-      .select("id, tipo, persona, monto_total, saldo_pendiente, fecha_vencimiento")
+      .select("id, tipo, persona, nombre, monto_total, saldo_pendiente, fecha_vencimiento")
       .eq("workspace_id", workspaceActual.id)
       .order("created_at", { ascending: false });
     setDeudas(data ?? []);
@@ -54,12 +58,14 @@ export default function DeudasPage() {
       workspace_id: workspaceActual.id,
       tipo: tab,
       persona,
+      nombre: nombreDeuda || null,
       monto_total: monto,
       saldo_pendiente: monto,
       fecha_vencimiento: vencimiento || null,
     });
 
     setPersona("");
+    setNombreDeuda("");
     setMonto(0);
     setVencimiento("");
     setMostrarForm(false);
@@ -67,12 +73,15 @@ export default function DeudasPage() {
     cargar();
   }
 
-  async function registrarPago(d: Deuda) {
-    const valor = prompt(`¿Cuánto pagó/pagaste de la deuda con ${d.persona}?`);
-    const pago = valor ? parseMoneyInput(valor) : 0;
-    if (pago <= 0) return;
-    const nuevoSaldo = Math.max(0, Number(d.saldo_pendiente) - pago);
-    await supabase.from("debts").update({ saldo_pendiente: nuevoSaldo }).eq("id", d.id);
+  async function registrarPago(monto: number, cuentaId: string) {
+    if (!deudaParaPagar) return;
+    const { error } = await supabase.rpc("fn_registrar_pago_deuda", {
+      p_debt_id: deudaParaPagar.id,
+      p_monto: monto,
+      p_account_id: cuentaId,
+      p_referencia: null,
+    });
+    if (error) throw new Error(error.message);
     cargar();
   }
 
@@ -108,6 +117,7 @@ export default function DeudasPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium text-sm">{d.persona}</div>
+                {d.nombre && <div className="text-xs text-black/50">{d.nombre}</div>}
                 <div className="text-xs text-black/40">
                   Total: {formatMoney(d.monto_total, moneda, !mostrarSaldos)}
                   {d.fecha_vencimiento && ` · Vence ${new Date(d.fecha_vencimiento).toLocaleDateString("es-PY")}`}
@@ -118,7 +128,7 @@ export default function DeudasPage() {
               </div>
             </div>
             {Number(d.saldo_pendiente) > 0 && (
-              <button className="text-xs text-brand-600 font-medium mt-2" onClick={() => registrarPago(d)}>
+              <button className="text-xs text-brand-600 font-medium mt-2" onClick={() => setDeudaParaPagar(d)}>
                 + Registrar pago
               </button>
             )}
@@ -127,6 +137,17 @@ export default function DeudasPage() {
         ))}
       </div>
 
+      {deudaParaPagar && workspaceActual && (
+        <ModalMontoCuenta
+          titulo={`Pago — ${deudaParaPagar.persona}`}
+          workspaceId={workspaceActual.id}
+          montoMaximo={Number(deudaParaPagar.saldo_pendiente)}
+          textoBoton={deudaParaPagar.tipo === "yo_debo" ? "Registrar pago" : "Registrar cobro"}
+          onConfirmar={registrarPago}
+          onCerrar={() => setDeudaParaPagar(null)}
+        />
+      )}
+
       {!mostrarForm ? (
         <button onClick={() => setMostrarForm(true)} className="btn-secondary">
           <Plus size={16} /> {tab === "yo_debo" ? "Registrar que debo" : "Registrar que me deben"}
@@ -134,6 +155,7 @@ export default function DeudasPage() {
       ) : (
         <div className="card p-4 flex flex-col gap-3">
           <input className="input" placeholder="Persona o entidad" value={persona} onChange={(e) => setPersona(e.target.value)} />
+          <input className="input" placeholder="Nombre de la deuda (opcional, ej. Préstamo familiar)" value={nombreDeuda} onChange={(e) => setNombreDeuda(e.target.value)} />
           <input
             className="input"
             placeholder="Monto"

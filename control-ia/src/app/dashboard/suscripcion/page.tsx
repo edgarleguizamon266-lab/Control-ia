@@ -24,10 +24,10 @@ export default function SuscripcionPage() {
       } = await supabase.auth.getUser();
       if (!user) return;
       const [{ data: sub }, { data: settings }] = await Promise.all([
-        supabase.from("subscriptions").select("estado, fecha_fin").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.rpc("fn_mi_suscripcion").maybeSingle(),
         supabase.from("system_settings").select("valor").eq("clave", "pago_qr").maybeSingle(),
       ]);
-      setSuscripcion(sub);
+      setSuscripcion(sub as any);
       setConfigQr(settings?.valor ?? null);
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

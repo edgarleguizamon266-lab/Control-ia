@@ -5,7 +5,7 @@ import { Plus, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { formatMoney, parseMoneyInput } from "@/lib/utils/currency";
-import { getAccountsWithBalance, type CuentaConSaldo } from "@/lib/financial-engine";
+import { getAccountsWithBalance, getPatrimonioNeto, type CuentaConSaldo, type PatrimonioNeto } from "@/lib/financial-engine";
 
 type Cuenta = CuentaConSaldo;
 
@@ -32,17 +32,20 @@ export default function CuentasPage() {
   const [cuentaGastoDefault, setCuentaGastoDefault] = useState("");
   const [cuentaIngresoDefault, setCuentaIngresoDefault] = useState("");
   const [guardandoPref, setGuardandoPref] = useState(false);
+  const [patrimonio, setPatrimonio] = useState<PatrimonioNeto | null>(null);
 
   async function cargar() {
     if (!workspaceActual) return;
-    const [data, { data: pref }] = await Promise.all([
+    const [data, { data: pref }, pat] = await Promise.all([
       getAccountsWithBalance(supabase, workspaceActual.id),
       supabase
         .from("workspace_preferences")
         .select("cuenta_predeterminada_gasto_id, cuenta_predeterminada_ingreso_id")
         .eq("workspace_id", workspaceActual.id)
         .maybeSingle(),
+      getPatrimonioNeto(supabase, workspaceActual.id),
     ]);
+    setPatrimonio(pat);
     setCuentas(data);
     setCuentaGastoDefault(pref?.cuenta_predeterminada_gasto_id ?? "");
     setCuentaIngresoDefault(pref?.cuenta_predeterminada_ingreso_id ?? "");
@@ -105,6 +108,40 @@ export default function CuentasPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Mis cuentas</h1>
       </div>
+
+      {patrimonio && (patrimonio.deuda_tarjetas > 0 || patrimonio.inversiones > 0 || patrimonio.deudas_pendientes > 0) && (
+        <div className="card p-4">
+          <div className="text-sm font-medium mb-3">Patrimonio neto</div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <div className="text-black/40 text-xs">Liquidez</div>
+              <div className="font-medium">{formatMoney(patrimonio.liquidez, moneda)}</div>
+            </div>
+            {patrimonio.inversiones > 0 && (
+              <div>
+                <div className="text-black/40 text-xs">Inversiones</div>
+                <div className="font-medium">{formatMoney(patrimonio.inversiones, moneda)}</div>
+              </div>
+            )}
+            {patrimonio.deuda_tarjetas > 0 && (
+              <div>
+                <div className="text-black/40 text-xs">Deuda tarjetas</div>
+                <div className="font-medium text-red-500">-{formatMoney(patrimonio.deuda_tarjetas, moneda)}</div>
+              </div>
+            )}
+            {patrimonio.deudas_pendientes > 0 && (
+              <div>
+                <div className="text-black/40 text-xs">Deudas pendientes</div>
+                <div className="font-medium text-red-500">-{formatMoney(patrimonio.deudas_pendientes, moneda)}</div>
+              </div>
+            )}
+          </div>
+          <div className="border-t border-black/5 mt-3 pt-3 flex items-center justify-between">
+            <span className="text-sm font-medium">Patrimonio neto</span>
+            <span className="font-semibold">{formatMoney(patrimonio.patrimonio_neto, moneda)}</span>
+          </div>
+        </div>
+      )}
 
       <div className="card divide-y divide-black/5">
         {cuentas.length === 0 && <div className="p-6 text-sm text-black/40 text-center">No tenés cuentas todavía.</div>}

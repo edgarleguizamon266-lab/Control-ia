@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
-import { formatMoney, parseMoneyInput } from "@/lib/utils/currency";
+import { formatMoney } from "@/lib/utils/currency";
+import ModalMontoCuenta from "@/components/ModalMontoCuenta";
 
 type Proveedor = {
   id: string;
@@ -24,6 +25,7 @@ export default function ProveedoresPage() {
   const [nombre, setNombre] = useState("");
   const [contacto, setContacto] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [proveedorParaPagar, setProveedorParaPagar] = useState<Proveedor | null>(null);
 
   async function cargar() {
     if (!negocio) return;
@@ -41,7 +43,7 @@ export default function ProveedoresPage() {
   }, [negocio]);
 
   async function agregar() {
-    if (guardando) return; // evita doble registro (doble tap / doble clic)
+    if (guardando) return;
     if (!negocio || !nombre) return;
     setGuardando(true);
     const {
@@ -56,49 +58,14 @@ export default function ProveedoresPage() {
     cargar();
   }
 
-  async function registrarPago(proveedor: Proveedor) {
-    const valor = prompt(`¿Cuánto le pagaste a ${proveedor.nombre}?`);
-    const monto = valor ? parseMoneyInput(valor) : 0;
-    if (monto <= 0 || !negocio) return;
-
-    const { data: cuentas } = await supabase.from("accounts").select("id, nombre").eq("workspace_id", negocio.id).eq("activa", true);
-    if (!cuentas || cuentas.length === 0) {
-      alert("Creá una cuenta primero para poder registrar el pago.");
-      return;
-    }
-    const nombresCuentas = cuentas.map((c, i) => `${i + 1}. ${c.nombre}`).join("\n");
-    const eleccion = prompt(`¿Desde qué cuenta pagaste?\n${nombresCuentas}`);
-    const idx = eleccion ? parseInt(eleccion, 10) - 1 : -1;
-    const cuenta = cuentas[idx];
-    if (!cuenta) return;
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    const { data: categoria } = await supabase
-      .from("transaction_categories")
-      .select("id")
-      .eq("workspace_tipo", "negocio")
-      .eq("nombre", "Compras")
-      .eq("tipo", "gasto")
-      .maybeSingle();
-
-    await supabase.from("transactions").insert({
-      user_id: user?.id,
-      workspace_id: negocio.id,
-      account_id: cuenta.id,
-      category_id: categoria?.id ?? null,
-      tipo: "gasto",
-      monto,
-      descripcion: `Pago a ${proveedor.nombre}`,
+  async function registrarPago(monto: number, cuentaId: string) {
+    if (!proveedorParaPagar) return;
+    const { error } = await supabase.rpc("fn_registrar_pago_proveedor", {
+      p_supplier_id: proveedorParaPagar.id,
+      p_monto: monto,
+      p_account_id: cuentaId,
     });
-
-    await supabase
-      .from("suppliers")
-      .update({ deuda_pendiente: Math.max(0, Number(proveedor.deuda_pendiente) - monto) })
-      .eq("id", proveedor.id);
-
+    if (error) throw new Error(error.message);
     cargar();
   }
 
@@ -123,7 +90,7 @@ export default function ProveedoresPage() {
               {Number(p.deuda_pendiente) > 0 ? (
                 <>
                   <div className="text-sm font-medium text-red-500">Debés {formatMoney(p.deuda_pendiente, moneda)}</div>
-                  <button className="text-xs text-brand-600 font-medium" onClick={() => registrarPago(p)}>
+                  <button className="text-xs text-brand-600 font-medium" onClick={() => setProveedorParaPagar(p)}>
                     + Registrar pago
                   </button>
                 </>
@@ -148,6 +115,17 @@ export default function ProveedoresPage() {
             <button className="btn-primary flex-1" disabled={guardando} onClick={agregar}>Guardar</button>
           </div>
         </div>
+      )}
+
+      {proveedorParaPagar && negocio && (
+        <ModalMontoCuenta
+          titulo={`Pago — ${proveedorParaPagar.nombre}`}
+          workspaceId={negocio.id}
+          montoMaximo={Number(proveedorParaPagar.deuda_pendiente)}
+          textoBoton="Registrar pago"
+          onConfirmar={registrarPago}
+          onCerrar={() => setProveedorParaPagar(null)}
+        />
       )}
     </div>
   );

@@ -1,21 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, ArrowLeftRight, Pencil, Trash2 } from "lucide-react";
+import { Plus, ArrowLeftRight, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { formatMoney } from "@/lib/utils/currency";
-
-type Mov = {
-  id: string;
-  tipo: "gasto" | "ingreso" | "transferencia";
-  monto: number;
-  fecha: string;
-  descripcion: string | null;
-  transaction_categories: { nombre: string } | null;
-  accounts: { nombre: string } | null;
-};
+import { getMovimientosEnriquecidos, type MovimientoEnriquecido } from "@/lib/financial-engine";
+import { tituloYSubtitulo } from "@/components/UltimosMovimientos";
+import ModalDetalleMovimiento from "@/components/ModalDetalleMovimiento";
 
 type Filtro = "todos" | "ingreso" | "gasto" | "transferencia";
 
@@ -29,12 +23,14 @@ const EMPTY_STATE: Record<Filtro, { mensaje: string; boton: string; href: string
 
 export default function MovimientosPage() {
   const supabase = createClient();
+  const router = useRouter();
   const { workspaceActual, workspaces, seleccion, moneda, mostrarSaldos, cargando: cargandoWs } = useWorkspace();
-  const [movs, setMovs] = useState<Mov[]>([]);
+  const [movs, setMovs] = useState<MovimientoEnriquecido[]>([]);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [busqueda, setBusqueda] = useState("");
+  const [detalle, setDetalle] = useState<MovimientoEnriquecido | null>(null);
 
   async function cargar() {
     const ids = seleccion === "todos" ? workspaces.map((w) => w.id) : workspaceActual ? [workspaceActual.id] : [];
@@ -44,24 +40,15 @@ export default function MovimientosPage() {
     }
     setCargando(true);
     setErrorCarga(null);
-    const { data, error } = await supabase
-      .from("transactions")
-      .select("id, tipo, monto, fecha, descripcion, transaction_categories(nombre), accounts!account_id(nombre)")
-      .in("workspace_id", ids)
-      .order("fecha", { ascending: false })
-      .limit(150);
-
-    if (error) {
-      // Nunca disfrazar un error real de base de datos como "no hay movimientos" —
-      // eso fue exactamente la causa del bug Dashboard-vs-Movimientos.
-      console.error("[movimientos] Error al cargar:", error);
+    try {
+      const data = await getMovimientosEnriquecidos(supabase, ids, 150);
+      setMovs(data);
+    } catch (e) {
+      // Nunca disfrazar un error real de base de datos como "no hay movimientos".
+      console.error("[movimientos] Error al cargar:", e);
       setErrorCarga("No se pudieron cargar tus movimientos. Probá recargar la página.");
       setMovs([]);
-      setCargando(false);
-      return;
     }
-
-    setMovs((data as unknown as Mov[]) ?? []);
     setCargando(false);
   }
 
@@ -74,13 +61,14 @@ export default function MovimientosPage() {
   async function eliminar(id: string) {
     if (!confirm("¿Eliminar este movimiento? Esta acción no se puede deshacer.")) return;
     await supabase.from("transactions").delete().eq("id", id);
+    setDetalle(null);
     cargar();
   }
 
   const movsFiltrados = movs.filter((m) => {
     if (filtro !== "todos" && m.tipo !== filtro) return false;
     if (busqueda) {
-      const texto = `${m.transaction_categories?.nombre ?? ""} ${m.descripcion ?? ""} ${m.accounts?.nombre ?? ""}`.toLowerCase();
+      const texto = `${m.categoria ?? ""} ${m.descripcion ?? ""} ${m.cuenta ?? ""} ${m.deuda_persona ?? ""} ${m.deuda_nombre ?? ""}`.toLowerCase();
       if (!texto.includes(busqueda.toLowerCase())) return false;
     }
     return true;
@@ -116,7 +104,7 @@ export default function MovimientosPage() {
         </div>
         <input
           className="input max-w-[220px]"
-          placeholder="Buscar por categoría, cuenta..."
+          placeholder="Buscar por categoría, cuenta, persona..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
         />
@@ -138,36 +126,42 @@ export default function MovimientosPage() {
             </Link>
           </div>
         )}
-        {movsFiltrados.map((m) => (
-          <div key={m.id} className="group flex items-center justify-between px-4 py-3">
-            <div>
-              <div className="font-medium text-sm">
-                {m.tipo === "transferencia" ? "Transferencia" : m.transaction_categories?.nombre ?? "Sin categoría"}
+        {movsFiltrados.map((m) => {
+          const { titulo, subtitulo } = tituloYSubtitulo(m);
+          return (
+            <button
+              key={m.id}
+              onClick={() => setDetalle(m)}
+              className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-black/[0.02] transition"
+            >
+              <div className="min-w-0">
+                <div className="font-medium text-sm truncate">{titulo}</div>
+                <div className="text-xs text-black/40 truncate">{subtitulo}</div>
               </div>
-              <div className="text-xs text-black/40">
-                {new Date(m.fecha).toLocaleDateString("es-PY")} · {m.accounts?.nombre ?? ""}
-                {m.descripcion ? ` · ${m.descripcion}` : ""}
+              <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                <span className={`font-medium text-sm ${m.tipo === "ingreso" ? "text-brand-600" : m.tipo === "gasto" ? "text-red-500" : "text-black/60"}`}>
+                  {m.tipo === "ingreso" ? "+" : m.tipo === "gasto" ? "-" : ""}
+                  {formatMoney(m.monto, moneda, !mostrarSaldos)}
+                </span>
+                <ChevronRight size={16} className="text-black/20" />
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className={`font-medium text-sm ${m.tipo === "ingreso" ? "text-brand-600" : m.tipo === "gasto" ? "text-red-500" : "text-black/60"}`}>
-                {m.tipo === "ingreso" ? "+" : m.tipo === "gasto" ? "-" : ""}
-                {formatMoney(m.monto, moneda, !mostrarSaldos)}
-              </div>
-              <div className="hidden group-hover:flex items-center gap-1">
-                {m.tipo !== "transferencia" && (
-                  <Link href={`/dashboard/movimientos/${m.id}/editar`} className="p-1.5 text-black/40 hover:text-brand-600" title="Editar">
-                    <Pencil size={14} />
-                  </Link>
-                )}
-                <button onClick={() => eliminar(m.id)} className="p-1.5 text-black/40 hover:text-red-500" title="Eliminar">
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
+            </button>
+          );
+        })}
       </div>
+
+      {detalle && (
+        <ModalDetalleMovimiento
+          mov={detalle}
+          onCerrar={() => setDetalle(null)}
+          onEditar={
+            !detalle.es_pago_deuda && detalle.tipo !== "transferencia"
+              ? () => router.push(`/dashboard/movimientos/${detalle.id}/editar`)
+              : undefined
+          }
+          onEliminar={!detalle.es_pago_deuda ? () => eliminar(detalle.id) : undefined}
+        />
+      )}
     </div>
   );
 }

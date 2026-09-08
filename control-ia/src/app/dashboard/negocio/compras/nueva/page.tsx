@@ -166,6 +166,9 @@ export default function NuevaCompraPage() {
         <div>
           <label className="text-sm font-medium mb-1 block">Concepto</label>
           <input className="input" value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Ej. Mercadería, insumos..." />
+          <p className="text-xs text-amber-600 -mt-2">
+            ⚠️ Si esta compra es mercadería que después vas a revender, cargá su costo en "Ventas" al momento de venderla, no acá — evitá restarlo dos veces (una como Compra y otra como Costo de la venta). Usá esta pantalla solo para gastos operativos del negocio.
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
