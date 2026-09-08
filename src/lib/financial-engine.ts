@@ -42,8 +42,11 @@ export async function getAccountsWithBalance(supabase: SupabaseClient, workspace
   return data ?? [];
 }
 
+// "Disponible" = LIQUIDEZ real (efectivo/banco/billetera/débito), nunca
+// mezclado con deuda de tarjetas de crédito ni inversiones (Fase 3.1/3.2 —
+// bug real confirmado: una tarjeta con deuda restaba directo del efectivo).
 export async function getWorkspaceBalance(supabase: SupabaseClient, workspaceId: string): Promise<number> {
-  const { data, error } = await supabase.rpc("fn_workspace_balance", { p_workspace_id: workspaceId });
+  const { data, error } = await supabase.rpc("fn_liquidez_workspace", { p_workspace_id: workspaceId });
   if (error) throw error;
   return Number(data ?? 0);
 }
@@ -142,39 +145,20 @@ export async function getTopProveedores(supabase: SupabaseClient, workspaceId: s
   return data ?? [];
 }
 
-export type MovimientoEnriquecido = {
-  id: string;
-  tipo: "gasto" | "ingreso" | "transferencia";
-  monto: number;
-  fecha: string;
-  descripcion: string | null;
-  origen: string;
-  categoria: string | null;
-  cuenta: string | null;
-  es_pago_deuda: boolean;
-  deuda_id: string | null;
-  deuda_nombre: string | null;
-  deuda_persona: string | null;
-  deuda_tipo: "yo_debo" | "me_deben" | null;
-  deuda_monto_total: number | null;
-  deuda_saldo_pendiente: number | null;
-  pago_deuda_monto: number | null;
+export type PatrimonioNeto = {
+  liquidez: number;
+  inversiones: number;
+  deuda_tarjetas: number;
+  deudas_pendientes: number;
+  patrimonio_neto: number;
 };
 
-export async function getMovimientosEnriquecidos(supabase: SupabaseClient, workspaceIds: string[], limite = 150): Promise<MovimientoEnriquecido[]> {
-  const { data, error } = await supabase.rpc("fn_movimientos_enriquecidos", { p_workspace_ids: workspaceIds, p_limite: limite });
+export async function getPatrimonioNeto(supabase: SupabaseClient, workspaceId: string): Promise<PatrimonioNeto | null> {
+  const { data, error } = await supabase.rpc("fn_patrimonio_neto", { p_workspace_id: workspaceId }).maybeSingle();
   if (error) throw error;
-  return data ?? [];
+  return data as PatrimonioNeto | null;
 }
 
-export async function getDeudaPagadoAcumulado(supabase: SupabaseClient, deudaId: string): Promise<number> {
-  const { data, error } = await supabase.rpc("fn_deuda_pagado_acumulado", { p_debt_id: deudaId });
-  if (error) throw error;
-  return Number(data ?? 0);
-}
-
-export function primerYUltimoDiaDelMes(fecha = new Date()) {
-  const desde = new Date(fecha.getFullYear(), fecha.getMonth(), 1).toISOString().slice(0, 10);
-  const hasta = fecha.toISOString().slice(0, 10);
-  return { desde, hasta };
-}
+export type MovimientoEnriquecido = {
+  id: string;
+  tipo: "gasto" | "ingreso" |
